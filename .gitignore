@@ -1,4 +1,7 @@
 config/
 builder/*.log
-# secrets / this machine only
-apps/*.local.env
+# app profiles, their environment and secrets belong to each machine: a fresh copy has none
+apps/*
+!apps/.gitkeep
+# notes for the maintainer, not part of the program
+docs/

@@ -210,6 +210,10 @@
   .bar { height: 10px; border-radius: 5px; background: #e7e5f8; overflow: hidden; min-width: 80px; }
   .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--violet)); }
   details.sheet { margin-top: 18px; }
+  .no-app-card { display: grid; gap: 10px; justify-items: start; max-width: 760px; }
+  .no-app-card h2 { margin: 0; }
+  .no-app-card p, .no-app-card ul { margin: 0; }
+  body.no-app main > .team, body.no-app main > .duo, body.no-app main > details { display: none; }
   details.sheet > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 14px 20px; }
   details.sheet > summary::-webkit-details-marker { display: none; }
   details.sheet > summary::before { content: ""; width: 8px; height: 8px; border-right: 3px solid var(--ink); border-bottom: 3px solid var(--ink); transform: rotate(-45deg); transition: transform .15s; }
@@ -334,6 +338,19 @@
     <div class="chip mis" title="นับเฉพาะในเบราว์เซอร์นี้"><span class="k">ภารกิจส่งซ้ำ</span><span class="v"><b id="mPass">0</b><small> ผ่าน </small><em id="mFail">0</em><small> ไม่ผ่าน</small></span></div>
     <div class="clock"><span id="updated">กำลังโหลด…</span><br><span id="mUpdate"></span></div>
   </header>
+
+  <!-- a fresh copy: no app profile yet -->
+  <section class="sheet pad no-app-card" id="noApp" hidden aria-labelledby="noAppTitle">
+    <h2 id="noAppTitle">ยังไม่มีแอป</h2>
+    <p>Replica Lab พร้อมแล้ว เพิ่มแอปแรกเพื่อเริ่มรันเป็นหลาย replica ได้จาก</p>
+    <ul>
+      <li><b>จาก image ในเครื่อง</b> ที่ build หรือ pull ไว้แล้ว เลือก image แล้วฟอร์มกรอกค่าให้เอง</li>
+      <li><b>จากโฟลเดอร์โปรเจกต์</b> ที่มี Dockerfile ระบบ build image ให้แล้วกรอกฟอร์มต่อ</li>
+      <li>หรือ <b>ควบคุม service</b> ที่รันอยู่ใน swarm แล้ว</li>
+    </ul>
+    <p class="small">ค่าทั่วไปใส่ในช่อง environment ของแอป ส่วนค่าที่เป็นความลับ (token, รหัสผ่าน) ใส่ในไฟล์ <code>apps\&lt;แอป&gt;.local.env</code> ในเครื่องนี้ (สร้างให้เองตอนรันแอปครั้งแรก การอัปเดตไม่แตะไฟล์นี้)</p>
+    <button class="primary" id="noAppBtn">เพิ่มแอปแรก</button>
+  </section>
 
   <!-- the team -->
   <section class="sheet team" aria-labelledby="teamTitle">
@@ -740,8 +757,15 @@ async function refresh() {
     const st = await r.json();
     if (!r.ok) throw new Error(st.error || r.status);
     max = st.max; desired = st.desired; lastStatus = st;
-    if (st.app && st.app.name !== APP?.name) onAppChanged(st.app);
     if (st.version) $("verTag").textContent = "v" + st.version;
+    document.body.classList.toggle("no-app", !!st.noApp);
+    $("noApp").hidden = !st.noApp;
+    if (st.noApp) {
+      $("appName").textContent = "ยังไม่มีแอป";
+      $("updated").textContent = "อัปเดต " + new Date(st.now).toLocaleTimeString("th-TH");
+      return;
+    }
+    if (st.app && st.app.name !== APP?.name) onAppChanged(st.app);
     $("target").max = max; $("range").max = max; $("maxText").textContent = max;
     $("sDesired").textContent = st.desired;
     $("sHealthy").textContent = st.healthy;
@@ -1355,6 +1379,7 @@ $("swarmList").addEventListener("click", async e => {
 });
 function closeApps() { $("appCard").hidden = true; $("appScrim").hidden = true; }
 $("appBtn").onclick = openApps;
+$("noAppBtn").onclick = openApps;
 $("appClose").onclick = closeApps;
 $("appScrim").onclick = closeApps;
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("appCard").hidden) closeApps(); });
@@ -1543,7 +1568,9 @@ async function switchTo(name, tune, attach) {
   const q = attach ? `ควบคุม service ${attach} จาก Replica Lab? ปรับจำนวน replica / เริ่ม / หยุด / ดู log ของ service นี้ได้ตรงๆ โดยไม่สร้างตัวใหม่ แอปที่ลงสนามอยู่จะหยุด (จำค่าไว้ให้) ปิด Replica Lab แล้ว ${attach} ยังรันต่อ`
           : tune ? `วัด RAM ของ ${name} ใหม่? ระบบจะรัน container ทดลอง 1 ตัวประมาณ 1-3 นาที${isRunning ? " แล้ว replica จะเริ่มใหม่ด้วยค่าใหม่" : " แล้วสลับไปใช้แอปนี้"}`
                : `สลับไปใช้ ${name}? แอปที่ลงสนามอยู่จะหยุด (จำค่าไว้ให้)`;
-  if ((tune || !isRunning) && !confirm(q)) return;
+  // the first app on a fresh copy stops nothing, so it needs no question
+  const ask = attach || tune || (!isRunning && !lastStatus?.noApp);
+  if (ask && !confirm(q)) return;
   closeApps();
   showSwitching(attach ? `กำลังเชื่อม ${attach}` : tune ? `กำลังวัด RAM ของ ${name}` : `กำลังสลับไป ${name}`);
   const t0 = Date.now();

@@ -78,6 +78,7 @@ function switchApp(name, tune) {
 
 // ---------- apps: profiles in apps\<name>.json (+ .env, + .tests.json) ----------
 const APPS = path.join(ROOT, "apps");
+fs.mkdirSync(APPS, { recursive: true });                      // a fresh copy has no apps yet
 const NAME_RE = /^[a-z0-9][a-z0-9-]{0,30}$/;
 const checkName = n => { if (!NAME_RE.test(String(n || ""))) throw new Error("ชื่อแอปใช้ได้แค่ a-z 0-9 และ - (ไม่เกิน 31 ตัว)"); return n; };
 const readJsonFile = (f, dflt) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return dflt; } };

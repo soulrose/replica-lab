@@ -8,9 +8,11 @@
 
 1. ติดตั้ง **Docker Desktop** ถ้ายังไม่มี โปรแกรมจะเปิดหน้าดาวน์โหลดให้เอง
 2. ติดตั้ง **Node.js รุ่น LTS** (https://nodejs.org/en/download) ถ้ายังไม่มี โปรแกรมจะเปิดหน้าดาวน์โหลดให้เอง
-3. แตก **`replica-lab-team.zip`** ไว้ที่ไหนก็ได้ที่ path **ไม่มีช่องว่าง** เช่น `C:\Tools\replica-lab` (ไม่ต้องติดตั้ง เป็นแบบ portable)
-4. ในโฟลเดอร์ `replica-lab` ดับเบิลคลิก **`create-shortcut.cmd`** จะได้ไอคอน **Replica Lab** บน Desktop (ย้ายโฟลเดอร์เมื่อไหร่ ให้รันอีกครั้ง)
-   - เลิกใช้ = ลบโฟลเดอร์และไอคอนบน Desktop ได้เลย
+3. ลงโปรแกรมแบบใดแบบหนึ่ง
+   - **ตัวติดตั้ง:** ดับเบิลคลิก `ReplicaLab-Setup-x.y.z.exe` กด ติดตั้ง (ค่าเริ่มต้น `%LOCALAPPDATA%\ReplicaLab` ห้ามมีช่องว่างใน path) ได้ไอคอนบน Desktop แล้วโปรแกรมเปิดเอง ถอนด้วย `ReplicaLab-Uninstall.exe`
+   - **แบบ portable:** แตก zip ไว้ที่ path ที่ไม่มีช่องว่าง เช่น `C:\Tools\replica-lab` แล้วดับเบิลคลิก **`create-shortcut.cmd`** ในโฟลเดอร์ `replica-lab` (ย้ายโฟลเดอร์เมื่อไหร่ให้รันอีกครั้ง) เลิกใช้ = ลบโฟลเดอร์และไอคอนได้เลย
+4. **โปรแกรมเปล่า** (จาก GitHub, `replica-lab-x.y.z.zip`, `ReplicaLab-Setup-x.y.z.exe`) ยังไม่มีแอป เปิดครั้งแรกจะขึ้นหน้า **ยังไม่มีแอป** กด **เพิ่มแอปแรก** แล้วเลือก image ในเครื่อง, build จากโฟลเดอร์โปรเจกต์ หรือควบคุม service ใน swarm ค่าลับใส่เองใน `apps\<แอป>.local.env`
+   - **ชุดของทีม** (`replica-lab-team.zip`, `ReplicaLab-Setup-x.y.z-team.exe`) มีแอปของทีมและ token มาให้แล้ว ส่งกันภายในทีมเท่านั้น
 
 ### เคยติดตั้งด้วย ReplicaLab-Setup (ตัวติดตั้งเดิม)
 เปลี่ยนมาใช้แบบ portable:
@@ -19,7 +21,7 @@
    - ติ๊ก "สำรอง..." ไว้ (ค่าเริ่มต้น) จะได้โฟลเดอร์ `ReplicaLab-backup-<วันเวลา>` บน Desktop ที่มี `apps\` (โปรไฟล์แอป, ชุดทดสอบ, ความลับ) และ `config\` (image/replica/port ที่ใช้ล่าสุด)
    - ลบเฉพาะโฟลเดอร์ที่ตัวติดตั้งลงไว้ (ปกติ `%LOCALAPPDATA%\ReplicaLab`), ไอคอนที่ชี้ไปที่นั่น และค่าใน registry ไม่แตะ image หรือ service อื่นใน Docker และไม่แตะตัว portable ที่อยู่ที่อื่น
    - แบบไม่มีหน้าต่าง: `ReplicaLab-Uninstall.exe /silent [/dir=C:\ReplicaLab] [/nobackup]`
-2. ทำขั้น 3-4 ด้านบน
+2. ลงแบบ portable ตามขั้น 3 ด้านบน
 3. ถ้าอยากได้แอปและชุดทดสอบเดิม คัดลอก `apps` และ `config` จากโฟลเดอร์สำรองไปวางทับในโฟลเดอร์ `replica-lab` ที่แตกไว้
 
 ## ใช้งาน
@@ -81,16 +83,20 @@ LABEL rama.lab.kind="tomcat" rama.lab.port="8080" rama.lab.health="/PatientProfi
 2. commit, `git tag vx.y.z`, `git push` แล้ว `git push origin vx.y.z` (tag ต้อง push แยก)
 3. เครื่องทีมจะเห็นป้าย "มีเวอร์ชันใหม่" ภายใน 10 นาทีหลังเปิดโปรแกรม
 
-**ทำไฟล์ส่งให้ทีม:** `make-package.ps1` ได้ `..\replica-lab-team.zip` (ตัว portable) และ `..\ReplicaLab-Uninstall.exe` (ถอนตัวที่ติดตั้งด้วย Setup เดิม, build ด้วย `launcher\build-uninstall.cmd`) ตัวติดตั้งเดิม `ReplicaLab-Setup-x.y.z.exe` ไม่ทำแล้ว ถ้ายังต้องการใช้ `make-package.ps1 -Setup`
+**ทำไฟล์ส่งต่อ:** `make-package.ps1` ทำไฟล์ไว้ที่โฟลเดอร์แม่ (`..\`)
+- ชุดของทีม (มีโปรไฟล์แอปและความลับของเครื่องนี้ ห้ามขึ้น GitHub): `replica-lab-team.zip`, `ReplicaLab-Setup-x.y.z-team.exe` เลือกเฉพาะบางแอปด้วย `-ExcludeApps a,b` เช่น `make-package.ps1 -ExcludeApps his-legacy-support,icheckup` ได้ชุดที่มีแค่ ramaservice
+- ชุดเปล่า (ไม่มีแอป ไม่มี token ขึ้น GitHub ได้): `replica-lab-x.y.z.zip`, `ReplicaLab-Setup-x.y.z.exe` สคริปต์ตรวจซ้ำว่าไม่มีไฟล์ใน `apps\` และ `config\` ก่อนปล่อย
+- `ReplicaLab-Uninstall.exe` ถอนตัวที่ลงด้วย Setup
 
-**ความลับ:** vault token ของ ramaservice อยู่ใน `apps\ramaservice.local.env` ซึ่งไม่ขึ้น git (repo เป็นสาธารณะ) zip ที่ส่งให้ทีม (`make-package.ps1`) มีไฟล์นี้ อย่าเอา zip ขึ้น GitHub ถ้าได้โปรแกรมจาก GitHub ให้ขอ token จากทีมแล้วใส่ไฟล์นี้เอง
+**ความลับและโปรไฟล์แอป:** repo เป็นสาธารณะ ทั้งโฟลเดอร์ `apps\` (โปรไฟล์, env, token, ชุดทดสอบ) และ `config\` ไม่ขึ้น git อัปเดตก็ไม่แตะ ถ้าได้โปรแกรมเปล่า ให้ขอค่าจากทีมแล้วเพิ่มแอปเอง
 
 ## ไฟล์
 
 | ไฟล์ | คืออะไร |
 |---|---|
 | `apps/<แอป>.json` | โปรไฟล์แอป: image, ชนิด, port, health, RAM, ชนิดการทดสอบ |
-| `apps/<แอป>.env` | environment ที่ส่งเข้า container (ramaservice: vault token ของทีม + ค่า Spring) |
+| `apps/<แอป>.env` | environment ที่ส่งเข้า container (แก้ได้ในหน้าเพิ่ม/แก้แอป) |
+| `apps/<แอป>.local.env` | ความลับของเครื่องนี้ เช่น token (แก้ด้วย Notepad) |
 | `apps/<แอป>.tests.json` | ชุดทดสอบที่บันทึกไว้ของแอปนั้น |
 | `config/` | ค่าเฉพาะเครื่อง: แอปล่าสุด, image/replica/port ที่ใช้ล่าสุดของแต่ละแอป (ไม่ต้องส่งต่อ) |
 | `builder/helper.log` | log ของตัวช่วยบนเครื่อง (เปิดแอป, สลับแอป, หยุดเพราะปิดหน้าต่าง, build) |
@@ -99,7 +105,12 @@ LABEL rama.lab.kind="tomcat" rama.lab.port="8080" rama.lab.health="/PatientProfi
 | `run-local.ps1 -App <ชื่อ>` | รันแอปจากคำสั่ง (ไม่เปิดหน้าต่าง) |
 
 ## ramaservice
-- ใช้ profile `dev` อ่านค่าจาก vault-dev ด้วย token ของทีมใน `apps/ramaservice.env`
+- ใช้ profile `dev` อ่านค่าจาก vault-dev ด้วย token ของทีมใน `apps\ramaservice.local.env` (`SPRING_CLOUD_VAULT_TOKEN=...`)
+- **token หมดอายุ:** replica จะขึ้นไม่สำเร็จและเริ่มใหม่วนไป ใน log มีข้อความจาก vault เช่น `403` หรือ `permission denied` (กด ดู log ทุกตัว แล้วกรองคำ `vault`) วิธีแก้:
+  1. ขอ token ใหม่จากทีม
+  2. เปิด `apps\ramaservice.local.env` ด้วย Notepad แก้ค่าหลัง `SPRING_CLOUD_VAULT_TOKEN=` แล้วบันทึก
+  3. ปิดหน้าต่าง Replica Lab แล้วเปิดใหม่ ตอนเปิดระบบจะ deploy ใหม่และอ่าน token ใหม่ (ทางอื่นที่ใช้ได้: รัน `run-local.ps1` เมื่อ stack ยังรันอยู่ ระบบจะทยอยรีสตาร์ท replica ทีละตัว)
+  - ต้องแก้ทุกเครื่อง เพราะไฟล์นี้อยู่ในเครื่องใครเครื่องมัน และการอัปเดตไม่แตะไฟล์นี้ ส่วนชุดของทีมที่จะส่งรอบต่อไป ให้แก้ไฟล์นี้ในเครื่องที่ทำชุดแล้วรัน `make-package.ps1` ใหม่
 - ปิด Liquibase (`SPRING_LIQUIBASE_ENABLED` และ `RAMA_LIQUIBASE_ENABLED`), Quartz และ Eureka ไว้ replica ในเครื่องจึงไม่แก้ schema ไม่รัน job และไม่ไปลงทะเบียนกับ dev
 - **build local:** ในหน้าเว็บเลือก worktree ของ ramaservice แล้วกด Build ได้ image `ramaservice:local-<branch>` ที่รวมไฟล์ที่ยังไม่ commit
 

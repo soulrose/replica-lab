@@ -18,6 +18,8 @@ const APP = {
   // a swarm service that was already running (not made by Replica Lab): the page controls it in place
   attached: process.env.APP_ATTACHED === "true",
 };
+// a fresh copy with no app profile yet: only the page runs, and it asks for the first app
+const NO_APP = process.env.APP_NONE === "true";
 const IS_SPRING = APP.kind === "spring";
 const TARGET_PORT = Number(process.env.TARGET_PORT || 8080);
 const MAX = Number(process.env.SCALER_MAX || 5);
@@ -302,6 +304,11 @@ async function nodeMemory() {
 }
 
 async function status() {
+  if (NO_APP) {
+    return { noApp: true, service: null, app: null, version: process.env.RL_VERSION || "dev", image: "", desired: 0, healthy: 0,
+             max: MAX, lastReplicas: null, updateStatus: null, nodeMemMb: await nodeMemory(), unitLimitMb: null,
+             publishedPorts: [], replicas: [], recent: [], now: new Date().toISOString() };
+  }
   const svc = await inspectService();
   const spec = svc.Spec;
   const desired = spec.Mode?.Replicated?.Replicas ?? null;
@@ -598,6 +605,9 @@ http.createServer(async (req, res) => {
       return res.end(INDEX);
     }
     if (req.method === "GET" && url.pathname === "/api/status") return send(res, 200, await status());
+    // no app yet: everything that needs the app service waits for the first app (added through the helper)
+    if (NO_APP && url.pathname.startsWith("/api/") && !["/api/images", "/api/pull"].includes(url.pathname))
+      return send(res, 409, { error: "ยังไม่มีแอป กด เพิ่มแอปแรก ก่อน" });
     if (req.method === "POST" && url.pathname === "/api/scale") {
       const { replicas } = await readJson(req);
       const n = Number(replicas);

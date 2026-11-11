@@ -55,10 +55,61 @@ if ($swarm -ne "active") {
 # 2. Which app, and its profile
 $running = Get-RunningApp $Stack
 $currentFile = Join-Path $PSScriptRoot "config\current-app.txt"
+$appsDir = Join-Path $PSScriptRoot "apps"
+New-Item -ItemType Directory -Force $appsDir | Out-Null
+$profiles = @(Get-ChildItem $appsDir -Filter *.json | Where-Object { $_.Name -notlike "*.tests.json" } | ForEach-Object { $_.BaseName })
 if (-not $App) {
     if ($running -and $running.name) { $App = $running.name }
     elseif (Test-Path $currentFile) { $App = (Get-Content $currentFile -Raw).Trim() }
-    if (-not $App) { $App = "ramaservice" }
+    if ($App -and $profiles -notcontains $App) { $App = "" }          # the last app was deleted
+    if (-not $App -and $profiles) { $App = $profiles[0] }
+}
+if (-not $App) {
+    # a fresh copy has no app yet: bring up only the Replica Lab page, where the team adds its first app
+    # (from a local image or a project folder). The page shows an empty state until then.
+    Step "no app yet: Replica Lab page only"
+    $ver = if (Test-Path (Join-Path $PSScriptRoot "VERSION")) { (Get-Content (Join-Path $PSScriptRoot "VERSION") -Raw).Trim() } else { "dev" }
+    if ($running -and $running.name) { Save-RunningApp $Stack | Out-Null }
+    docker build -q -t replica-lab-scaler:local .\scaler | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "docker build failed" }
+    $scalerId = (docker image inspect replica-lab-scaler:local --format "{{.Id}}").Split(":")[1].Substring(0, 12)
+    docker tag replica-lab-scaler:local "replica-lab-scaler:$scalerId"
+    $yml = @"
+# written by run-local.ps1: no app profile in apps\ yet, so only the Replica Lab page
+version: "3.8"
+services:
+  scaler:
+    image: replica-lab-scaler:$scalerId
+    environment:
+      TARGET_SERVICE: "${Stack}_app"
+      APP_NONE: "true"
+      RL_VERSION: "$ver"
+      SCALER_MAX: "$Max"
+    ports:
+      - { target: 8090, published: $ScalerPort, protocol: tcp, mode: ingress }
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [net]
+    deploy:
+      replicas: 1
+      placement: { constraints: [node.role == manager] }
+      resources: { limits: { cpus: "0.5", memory: 128M } }
+networks:
+  net: { driver: overlay, attachable: true }
+"@
+    $ymlFile = Join-Path $PSScriptRoot "config\stack-empty.yml"
+    New-Item -ItemType Directory -Force (Split-Path $ymlFile) | Out-Null
+    [IO.File]::WriteAllText($ymlFile, $yml)
+    for ($try = 1; $try -le 10; $try++) {
+        docker stack deploy -c $ymlFile --resolve-image never --prune $Stack
+        if ($LASTEXITCODE -eq 0) { break }
+        if ($try -eq 10) { throw "stack deploy failed" }
+        Write-Host "   previous stack still shutting down, retry in 3 s ($try/10)"
+        Start-Sleep 3
+    }
+    Write-Host ""
+    Write-Host "Replica Lab http://localhost:$ScalerPort   (no app yet: add one on the page)" -ForegroundColor Green
+    exit 0
 }
 $profileFile = Join-Path $PSScriptRoot "apps\$App.json"
 if (-not (Test-Path $profileFile)) { throw "no app profile apps\$App.json" }
