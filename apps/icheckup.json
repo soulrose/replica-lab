@@ -1,0 +1,14 @@
+{
+  "name": "icheckup",
+  "title": "icheckup",
+  "image": "icheckup:local",
+  "kind": "tomcat",
+  "port": 8080,
+  "hostPort": 8085,
+  "health": "/",
+  "startPeriod": 60,
+  "memoryMb": 512,
+  "test": "http",
+  "buildLocal": false,
+  "note": ""
+}

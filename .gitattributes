@@ -1,0 +1,6 @@
+# .cmd files need CRLF (labels / goto break with LF); keep the rest as text with normal conversion
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.exe binary
+*.ico binary

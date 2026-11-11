@@ -1,0 +1,4 @@
+{
+  "repo": "soulrose/replica-lab",
+  "note": "updates = git tags vMAJOR.MINOR.PATCH on this GitHub repo; private repo -> each PC saves a read token on the About page (config/github-token.txt)"
+}

@@ -1,0 +1,70 @@
+# Replica Lab: one app at a time on Docker Swarm (several replicas behind the routing mesh) + the Scaler page.
+# Deploy with run-local.ps1 -App <name>: it reads apps\<name>.json and fills in the APP_* values below.
+#   app     -> http://localhost:<hostPort from the profile>   (the routing mesh spreads connections over the replicas)
+#   scaler  -> http://localhost:18090                          (Replica Lab page)
+version: "3.8"
+
+services:
+  app:
+    image: ${APP_IMAGE}
+    env_file:
+      - ${APP_ENV_FILE}                          # apps\<name>.env (in git; ramaservice: Spring settings)
+      - ${APP_LOCAL_ENV_FILE}                    # apps\<name>.local.env (this machine only: tokens/passwords, not in git)
+    dns: ["${RS_DNS1:-10.6.22.16}", "${RS_DNS2:-10.6.22.15}"]   # hospital DNS: Docker Desktop cannot resolve internal hosts by itself
+    ports:
+      - target: ${APP_PORT}
+        published: ${APP_HOST_PORT}
+        protocol: tcp
+        mode: ingress
+    networks: [net]
+    # A task counts as Running only once this passes; the routing mesh sends traffic to healthy tasks only.
+    healthcheck:
+      test: ["CMD-SHELL", "${APP_HEALTH_CMD}"]
+      interval: 15s
+      timeout: 10s
+      start_period: ${APP_START_PERIOD}s
+      retries: 12
+    deploy:
+      mode: replicated
+      replicas: ${APP_REPLICAS}
+      endpoint_mode: vip
+      resources:
+        limits: { cpus: "2.0", memory: "${APP_MEMORY}M" }
+        reservations: { memory: "${APP_RESERVE}M" }
+      restart_policy: { condition: any, delay: 10s, window: 120s }
+      update_config: { parallelism: 1, order: start-first, failure_action: rollback, monitor: 30s }
+      rollback_config: { parallelism: 1, order: start-first }
+      labels:
+        rama.lab.app: "${APP_NAME}"
+
+  scaler:
+    image: ${SCALER_IMAGE:-replica-lab-scaler:local}
+    environment:
+      TARGET_SERVICE: ${RS_STACK:-replicalab}_app
+      TARGET_PORT: "${APP_PORT}"
+      APP_NAME: "${APP_NAME}"
+      APP_KIND: "${APP_KIND}"
+      APP_HEALTH: "${APP_HEALTH}"
+      APP_TEST: "${APP_TEST}"
+      APP_BUILD_LOCAL: "${APP_BUILD_LOCAL}"
+      APP_MEMORY: "${APP_MEMORY}"
+      RL_VERSION: "${RL_VERSION:-dev}"           # Replica Lab version (VERSION file), shown on the page
+      SCALER_MAX: ${SCALER_MAX:-5}
+    ports:
+      - target: 8090
+        published: ${SCALER_PORT:-18090}
+        protocol: tcp
+        mode: ingress
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock   # scale = Docker API service update; manager node only
+    networks: [net]
+    deploy:
+      replicas: 1
+      placement: { constraints: [node.role == manager] }
+      resources:
+        limits: { cpus: "0.5", memory: 128M }
+
+networks:
+  net:
+    driver: overlay
+    attachable: true

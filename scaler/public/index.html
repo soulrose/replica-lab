@@ -1,0 +1,1560 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Replica Lab</title>
+<style>
+  :root {
+    --sky-1: #3d5afe; --sky-2: #6c3df5; --sky-3: #9b3df0;
+    --ink: #1d1847; --ink-soft: rgba(29,24,71,.35); --muted: #5d5a8a; --faint: #9a97c0;
+    --card: #ffffff; --card-2: #f4f3ff; --line: #d9d7f2;
+    --yellow: #ffd23f; --yellow-edge: #d9a600;
+    --green: #22c55e; --green-soft: #dcfce7; --green-edge: #15803d;
+    --orange: #ff9f1c; --orange-soft: #fff1dc;
+    --red: #ff4d6d; --red-soft: #ffe1e7;
+    --cyan: #19c6e6; --cyan-soft: #d9f8ff;
+    --violet: #7c5cff; --violet-soft: #ece7ff;
+    --pink: #ff5fa2;
+    --r-lg: 20px; --r-md: 14px; --r-sm: 11px;
+    --font: "Leelawadee UI", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --hud: "Bahnschrift", "Segoe UI Variable Display", "Leelawadee UI", sans-serif;
+    --mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--ink); font: 14px/1.55 var(--font);
+    background:
+      radial-gradient(circle at 12% -5%, rgba(120,190,255,.75), transparent 42%),
+      radial-gradient(circle at 105% 15%, rgba(255,110,200,.45), transparent 40%),
+      repeating-linear-gradient(45deg, rgba(255,255,255,.045) 0 2px, transparent 2px 26px),
+      linear-gradient(160deg, var(--sky-1), var(--sky-2) 55%, var(--sky-3));
+    background-attachment: fixed;
+  }
+  main { max-width: 1240px; margin: 0 auto; padding: 16px 16px 56px; overflow-x: clip; }
+  a { color: var(--violet); font-weight: 600; text-underline-offset: 2px; }
+  :focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  /* ---------- chunky controls ---------- */
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button {
+    min-height: 38px; padding: 6px 18px; cursor: pointer; font: 700 14px var(--hud); letter-spacing: .01em; color: var(--ink);
+    background: var(--card); border: 2.5px solid var(--ink); border-radius: var(--r-sm); box-shadow: 0 4px 0 var(--ink);
+    transition: transform .06s, box-shadow .06s, background-color .12s;
+  }
+  button:hover:not(:disabled) { background: var(--card-2); }
+  button:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  button:disabled { opacity: .45; cursor: default; box-shadow: 0 2px 0 var(--ink-soft); border-color: var(--faint); color: var(--muted); }
+  button.primary { background: var(--yellow); }
+  button.primary:hover:not(:disabled) { background: #ffdc66; }
+  button.quiet { border-color: transparent; box-shadow: none; background: transparent; }
+  button.mini { min-height: 28px; padding: 2px 12px; font-size: 12.5px; box-shadow: 0 3px 0 var(--ink); border-width: 2px; }
+  #startBtn:not(:disabled) { background: var(--green); color: #fff; }
+  #stopBtn:not(:disabled):hover { background: var(--red); color: #fff; }
+  input[type=text], input[type=number], select, textarea {
+    min-height: 38px; padding: 6px 11px; border-radius: var(--r-sm); border: 2px solid var(--line); background: #fff; min-width: 0; max-width: 100%;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--violet); box-shadow: 0 0 0 4px var(--violet-soft); }
+  input[type=number] { width: 84px; font: 700 15px var(--hud); font-variant-numeric: tabular-nums; }
+  input[type=range] { accent-color: var(--violet); }
+  input[type=checkbox] { accent-color: var(--violet); width: 17px; height: 17px; margin: 0; }
+  textarea { display: block; width: 100%; font: 12.5px/1.5 var(--mono); resize: vertical; padding: 10px 12px; background: #fbfaff; }
+  label.check { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .field { display: grid; gap: 5px; min-width: 0; }
+  .field > span { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+  .msg { min-height: 20px; font-size: 13px; color: var(--muted); margin-top: 8px; overflow-wrap: anywhere; }
+  .msg.err { color: #d61f45; font-weight: 600; }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .num { font-variant-numeric: tabular-nums; text-align: right; }
+  .small { font-size: 12px; color: var(--muted); }
+
+  /* ---------- sticker panels ---------- */
+  .sheet { background: var(--card); border: 2.5px solid var(--ink); border-radius: var(--r-lg); box-shadow: 0 7px 0 var(--ink-soft); min-width: 0; }
+  .pad { padding: 18px 20px; }
+  h2 { font: 700 18px/1.25 var(--hud); margin: 0; }
+  h2 small { font: 600 12.5px var(--font); color: var(--muted); margin-left: 8px; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .gap { margin-top: 14px; }
+  .divider { height: 2px; background: repeating-linear-gradient(90deg, var(--line) 0 8px, transparent 8px 14px); margin: 18px 0; }
+
+  /* ---------- resource bar ---------- */
+  .resbar { display: flex; align-items: center; gap: 12px 18px; flex-wrap: wrap; padding: 12px 18px; margin-bottom: 18px; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-right: 4px; }
+  .brand svg { width: 40px; height: 40px; }
+  .brand h1 { font: 800 22px/1 var(--hud); margin: 0; letter-spacing: .01em; color: var(--ink); }
+  .chip { display: grid; gap: 2px; padding: 6px 12px; border-radius: var(--r-md); background: var(--card-2); border: 2px solid var(--line); min-width: 0; }
+  .chip .k { font-size: 11.5px; font-weight: 700; color: var(--muted); }
+  .chip .v { font: 800 20px/1.05 var(--hud); font-variant-numeric: tabular-nums; }
+  .chip .v small { font: 700 12px var(--hud); color: var(--muted); }
+  .chip.energy { flex: 1 1 210px; max-width: 300px; }
+  .ebar { height: 10px; border-radius: 6px; background: #e3e1f7; overflow: hidden; border: 2px solid var(--ink); margin-top: 3px; }
+  .ebar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--cyan), var(--violet), var(--pink)); transition: width .4s; }
+  .ebar.hot i { background: linear-gradient(90deg, var(--orange), var(--red)); }
+  .chip.pop .v { color: var(--violet); } .chip.ready .v { color: var(--green-edge); } .chip.build .v { color: #d97706; }
+  .chip.mis .v b { color: var(--green-edge); } .chip.mis .v em { color: #d61f45; font-style: normal; }
+  .clock { margin-left: auto; font: 600 12px var(--hud); color: var(--muted); text-align: right; }
+
+  /* ---------- the team (unit cards) ---------- */
+  .team { padding: 18px 20px 16px; }
+  .run-state { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .bays { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 16px; }
+  .unit {
+    position: relative; display: flex; flex-direction: column; text-align: left; padding: 0; overflow: visible; min-height: 196px;
+    background: var(--card); border: 2.5px solid var(--ink); border-radius: var(--r-md); box-shadow: 0 5px 0 var(--ink); font: inherit; letter-spacing: 0; color: var(--ink);
+  }
+  button.unit:hover:not(:disabled) { background: var(--card); transform: translateY(-3px); box-shadow: 0 8px 0 var(--ink); }
+  button.unit:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 3px 0 var(--ink); }
+  .unit .band { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 7px 10px 7px 12px; border-radius: 11px 11px 0 0;
+                font: 700 12.5px var(--hud); color: #fff; background: var(--faint); border-bottom: 2.5px solid var(--ink); }
+  .unit .badge { position: absolute; left: 50%; top: 44px; transform: translateX(-50%); width: 64px; height: 64px; border-radius: 50%;
+                 display: grid; place-items: center; background: var(--card-2); border: 3px solid var(--ink); box-shadow: 0 4px 0 var(--ink-soft);
+                 font: 800 30px/1 var(--hud); font-variant-numeric: tabular-nums; }
+  .unit .body { margin-top: 82px; padding: 0 12px 12px; display: grid; gap: 6px; }
+  .unit .who { text-align: center; font: 700 12px var(--hud); color: var(--muted); }
+  .meter { display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 6px; font: 700 11px var(--hud); color: var(--muted); }
+  .hp { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; height: 10px; }
+  .hp i { background: #e7e5f8; border-radius: 2px; }
+  .hp i.on { background: var(--green); box-shadow: inset 0 -2px 0 rgba(0,0,0,.15); }
+  .unit.bad .hp i.on { background: var(--red); }
+  .unit.starting .hp i.on { background: var(--orange); }
+  .en { height: 10px; border-radius: 5px; background: #e7e5f8; overflow: hidden; }
+  .en i { display: block; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--violet)); }
+  .unit .facts { display: flex; justify-content: space-between; font: 700 12px var(--hud); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .unit .task { font-family: var(--mono); font-size: 11px; color: var(--faint); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .unit .hint-log { font: 700 11.5px var(--hud); color: var(--violet); }
+
+  .unit.ok .band { background: var(--green); }
+  .unit.ok .badge { background: var(--green-soft); color: var(--green-edge); }
+  .unit.starting .band { background: var(--orange); }
+  .unit.starting .badge { background: var(--orange-soft); color: #b45309; animation: bob 1.2s ease-in-out infinite; }
+  .unit.bad .band { background: var(--red); }
+  .unit.bad .badge { background: var(--red-soft); color: #c0143c; }
+  .unit.empty, .unit.pending { background: rgba(255,255,255,.55); border-style: dashed; box-shadow: none; }
+  .unit.empty .band, .unit.pending .band { background: transparent; color: var(--muted); border-bottom: 2px dashed var(--faint); }
+  .unit.empty .badge { background: transparent; border-style: dashed; color: var(--faint); box-shadow: none; }
+  .unit.empty .plus { margin-top: 84px; text-align: center; font: 800 14px var(--hud); color: var(--violet); }
+  .unit.pending .badge { background: repeating-linear-gradient(135deg, var(--orange-soft) 0 6px, #fff 6px 12px); }
+  .unit.will-add { border: 2.5px dashed var(--cyan); background: var(--cyan-soft); box-shadow: 0 0 0 4px rgba(25,198,230,.25); }
+  .unit.will-add .band { color: #0e7490; }
+  .unit.will-remove { opacity: .6; border-color: var(--red); }
+  .unit.will-remove .band { background: var(--red); }
+  .bays.busy .unit.ok { animation: hop .5s ease-in-out infinite alternate; }
+  .bays.busy .unit.ok:nth-child(2n) { animation-delay: .25s; }
+  @keyframes bob { 50% { transform: translateX(-50%) translateY(-4px); } }
+  @keyframes hop { to { transform: translateY(-5px); } }
+  .float { position: absolute; left: 50%; top: 28px; transform: translateX(-50%); font: 800 22px var(--hud); color: var(--yellow);
+           -webkit-text-stroke: 1.5px var(--ink); pointer-events: none; animation: rise 2.4s ease-out forwards; z-index: 2; }
+  @keyframes rise { 0% { opacity: 0; margin-top: 10px; } 15% { opacity: 1; } 100% { opacity: 0; margin-top: -46px; } }
+
+  .scale-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; margin-top: 18px; padding-top: 16px; border-top: 2px dashed var(--line); }
+  .stepper { display: inline-flex; align-items: stretch; border: 2.5px solid var(--ink); border-radius: var(--r-sm); background: #fff; box-shadow: 0 4px 0 var(--ink); overflow: hidden; }
+  .stepper button { border: 0; border-radius: 0; box-shadow: none; min-width: 42px; font-size: 20px; padding: 0; }
+  .stepper button:active:not(:disabled) { transform: none; background: var(--card-2); }
+  .stepper input { border: 0; border-left: 2px solid var(--line); border-right: 2px solid var(--line); border-radius: 0; width: 60px; text-align: center; font: 800 20px var(--hud); }
+  .stepper input:focus { box-shadow: none; }
+  #range { flex: 1 1 160px; min-width: 120px; }
+  .scale-bar .spacer { flex: 1 1 auto; }
+
+  /* ---------- lower panels ---------- */
+  .duo { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 18px; margin-top: 20px; align-items: start; }
+  @media (max-width: 960px) { .duo { grid-template-columns: minmax(0, 1fr); } }
+  .segmented { display: inline-flex; padding: 3px; gap: 3px; border: 2.5px solid var(--ink); border-radius: var(--r-sm); background: var(--card-2); }
+  .segmented button { border: 0; box-shadow: none; min-height: 32px; padding: 4px 14px; border-radius: 8px; background: transparent; color: var(--muted); }
+  .segmented button:active:not(:disabled) { transform: none; }
+  .segmented button[aria-selected="true"] { background: var(--violet); color: #fff; }
+  .dup-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; }
+  @media (max-width: 640px) { .dup-grid { grid-template-columns: minmax(0, 1fr); } }
+  .opts { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; margin-top: 12px; }
+  .hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+  .hint code { font-family: var(--mono); font-size: 12px; background: var(--violet-soft); padding: 1px 6px; border-radius: 6px; color: var(--ink); }
+
+  /* mutation picker */
+  .combo { position: relative; min-width: 0; }
+  .combo input { width: 100%; padding-right: 34px; font-weight: 600; cursor: pointer;
+                 background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231d1847' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 12px center; }
+  .combo-list { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 10; max-height: 360px; overflow: auto; padding: 6px;
+                background: #fff; border: 2.5px solid var(--ink); border-radius: var(--r-md); box-shadow: 0 6px 0 var(--ink-soft); }
+  .combo-group { position: sticky; top: -6px; margin: 0 -6px; padding: 8px 16px 4px; background: #fff; font: 700 11.5px var(--hud); color: var(--muted); }
+  .combo-group.warn { color: #b45309; }
+  .combo-item { padding: 7px 10px; border-radius: 10px; cursor: pointer; }
+  .combo-item[aria-selected="true"], .combo-item:hover { background: var(--violet-soft); }
+  .combo-item b { font: 700 13.5px var(--hud); }
+  .combo-item small { display: block; font: 11.5px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .combo-item .tag { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px; font: 700 10.5px var(--hud); vertical-align: 1px; }
+  .tag.safe { background: var(--green-soft); color: var(--green-edge); }
+  .tag.danger { background: var(--orange-soft); color: #b45309; }
+  .combo-empty { padding: 12px; color: var(--muted); font-size: 13px; }
+
+  /* mission result: a sticker with a starburst behind it */
+  .verdict { position: relative; display: inline-block; margin: 8px 18px 10px 6px; padding: 10px 20px; vertical-align: middle; transform: rotate(-3deg);
+             font: 800 22px/1 var(--hud); color: #fff; border: 3px solid var(--ink); border-radius: 14px; box-shadow: 0 5px 0 var(--ink); animation: pop .35s cubic-bezier(.2,1.6,.4,1); }
+  .verdict::before { content: ""; position: absolute; inset: -18px -22px; z-index: -1; background: var(--yellow);
+                     clip-path: polygon(50% 0, 60% 30%, 92% 12%, 72% 42%, 100% 55%, 70% 64%, 84% 96%, 54% 76%, 38% 100%, 33% 70%, 4% 84%, 22% 56%, 0 38%, 30% 32%, 18% 4%, 44% 24%); }
+  .verdict.ok { background: var(--green); }
+  .verdict.bad { background: var(--red); }
+  .verdict.bad::before { background: #ffd0da; }
+  @keyframes pop { from { transform: rotate(-3deg) scale(.4); opacity: 0; } }
+
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  th { text-align: left; font: 700 12.5px var(--hud); color: var(--muted); padding: 8px 10px; border-bottom: 2px solid var(--line); white-space: nowrap; }
+  td { padding: 9px 10px; border-bottom: 1px solid #ecebf9; vertical-align: top; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover td { background: var(--card-2); }
+  .pill { display: inline-block; padding: 1px 10px; border-radius: 999px; font: 700 12px var(--hud); white-space: nowrap; border: 2px solid currentColor; }
+  .pill.ok { background: var(--green-soft); color: var(--green-edge); } .pill.warn { background: var(--orange-soft); color: #b45309; }
+  .pill.bad { background: var(--red-soft); color: #c0143c; } .pill.idle { background: var(--violet-soft); color: var(--violet); }
+  .bar { height: 10px; border-radius: 5px; background: #e7e5f8; overflow: hidden; min-width: 80px; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--violet)); }
+  details.sheet { margin-top: 18px; }
+  details.sheet > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 14px 20px; }
+  details.sheet > summary::-webkit-details-marker { display: none; }
+  details.sheet > summary::before { content: ""; width: 8px; height: 8px; border-right: 3px solid var(--ink); border-bottom: 3px solid var(--ink); transform: rotate(-45deg); transition: transform .15s; }
+  details.sheet[open] > summary::before { transform: rotate(45deg); }
+  details.sheet > .tablewrap { padding: 0 20px 16px; }
+
+  button.danger:not(:disabled) { color: #c0143c; }
+  button.danger:not(:disabled):hover { background: var(--red); color: #fff; }
+  .app-item .acts { flex-wrap: wrap; justify-content: flex-end; }
+  .app-chip .v { display: flex; align-items: center; gap: 8px; font-size: 17px; }
+  .saved { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: flex-end; }
+  .drawer { position: fixed; top: 12px; right: 12px; bottom: 12px; width: min(760px, calc(100vw - 24px)); z-index: 21; overflow: auto; padding: 16px 18px;
+            background: var(--card); border: 2.5px solid var(--ink); border-radius: var(--r-lg); box-shadow: 0 8px 0 var(--ink-soft); animation: drawer .2s ease-out; }
+  .drawer .head { margin-bottom: 10px; }
+  .app-list { display: grid; gap: 10px; }
+  .app-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 12px;
+              border: 2px solid var(--line); border-radius: var(--r-md); background: var(--card-2); }
+  .app-item.on { border-color: var(--green); background: var(--green-soft); }
+  .app-item b { font: 700 15px var(--hud); }
+  .app-item .small { overflow-wrap: anywhere; }
+  .app-item .acts { display: flex; gap: 6px; grid-row: span 2; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 12px; align-items: start; }
+  .form-grid input[type=checkbox] { width: 17px; flex: none; }
+  .form-grid input.bad { border-color: var(--red); background: var(--red-soft); box-shadow: 0 0 0 4px rgba(255,77,109,.18); }
+  .form-grid .field .check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; }
+  .form-grid input, .form-grid select { width: 100%; }
+  .switching { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 20px;
+               background: rgba(29,24,71,.55); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+  .sw-card { width: min(600px, 100%); background: var(--card); border: 2.5px solid var(--ink); border-radius: var(--r-lg); box-shadow: 0 8px 0 var(--ink-soft); padding: 22px 24px; }
+  .sw-card h2 { font-size: 22px; }
+  .sw-step { margin: 14px 0 10px; font: 700 16px var(--hud); }
+  .sw-track { height: 14px; border: 2.5px solid var(--ink); border-radius: 8px; background: #ecebff; overflow: hidden; }
+  .sw-track i { display: block; height: 100%; width: 35%; border-radius: 4px; background: linear-gradient(90deg, var(--cyan), var(--violet), var(--pink)); animation: swslide 1.4s ease-in-out infinite alternate; }
+  .switching.done .sw-track i { width: 100%; animation: none; background: var(--green); }
+  .switching.err .sw-track i { width: 100%; animation: none; background: var(--red); }
+  @keyframes swslide { from { margin-left: 0; } to { margin-left: 65%; } }
+  #swTime { margin-top: 8px; }
+  #swLog { margin: 12px 0 0; max-height: 170px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11.5px/1.45 var(--mono);
+           color: #c9f7dc; background: #17143a; border: 2px solid var(--ink); border-radius: var(--r-sm); padding: 8px 10px; }
+  #swActions { margin-top: 14px; }
+  dl.sel { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0; font-size: 13.5px; }
+  dl.sel dt { color: var(--muted); font-weight: 600; } dl.sel dd { margin: 0; overflow-wrap: anywhere; }
+  .brand { cursor: pointer; }
+  .brand .ver { font: 700 12px var(--hud); color: var(--muted); align-self: flex-end; margin-bottom: 2px; }
+  button.upd { background: var(--green); color: #fff; }
+  pre.notes { margin: 8px 0 0; max-height: 260px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.55 var(--font);
+              background: var(--card-2); border: 2px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; }
+  #fLog { margin: 8px 0 0; max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11.5px/1.45 var(--mono);
+          color: #c9f7dc; background: #17143a; border: 2px solid var(--ink); border-radius: var(--r-sm); padding: 8px 10px; }
+  #fLog .e { color: #ff8fa6; }
+  #appLog { margin: 8px 0 0; max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11.5px/1.45 var(--mono);
+            color: #c9f7dc; background: #17143a; border: 2px solid var(--ink); border-radius: var(--r-sm); padding: 8px 10px; }
+  #bLog { margin: 8px 0 0; max-height: 200px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11.5px/1.45 var(--mono);
+          color: #c9f7dc; background: #17143a; border: 2px solid var(--ink); border-radius: var(--r-sm); padding: 8px 10px; }
+  #bLog .e { color: #ff8fa6; }
+
+  /* ---------- log drawer ---------- */
+  .scrim { position: fixed; inset: 0; background: rgba(29,24,71,.45); z-index: 20; }
+  #logCard {
+    position: fixed; top: 12px; right: 12px; bottom: 12px; width: min(800px, calc(100vw - 24px)); z-index: 21; display: flex; flex-direction: column; padding: 16px 18px; gap: 10px;
+    background: var(--card); border: 2.5px solid var(--ink); border-radius: var(--r-lg); box-shadow: 0 8px 0 var(--ink-soft); animation: drawer .2s ease-out;
+  }
+  @keyframes drawer { from { transform: translateX(30px); opacity: 0; } }
+  #logCard .head { margin: 0; }
+  #logInfo { font: 600 12.5px var(--hud); color: var(--muted); }
+  #logBox { flex: 1; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 var(--mono); color: #d7f9e5;
+            background: #17143a; border: 2px solid var(--ink); border-radius: var(--r-md); padding: 12px 14px; }
+  #logBox .e { color: #ff8fa6; } #logBox .w { color: #ffd27a; }
+  #logBox mark { background: rgba(255,210,63,.35); color: #fff; border-radius: 3px; }
+
+  @media (max-width: 560px) {
+    .pad, .team { padding: 16px; }
+    .bays { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+    .clock { margin-left: 0; width: 100%; text-align: left; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <!-- resources -->
+  <header class="sheet resbar">
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true">
+        <defs><linearGradient id="mk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8462ee"/><stop offset="1" stop-color="#3a2496"/></linearGradient></defs>
+        <rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="url(#mk)" stroke="#1d1847" stroke-width="2.5"/>
+        <rect x="13" y="7" width="20" height="14" rx="4" fill="#fff" opacity=".55"/><rect x="10" y="13" width="20" height="14" rx="4" fill="#fff" opacity=".8"/>
+        <rect x="7" y="19" width="20" height="14" rx="4" fill="#fff"/>
+        <rect x="10" y="23.5" width="9" height="1.8" rx=".9" fill="#7862c8"/><rect x="10" y="27" width="9" height="1.8" rx=".9" fill="#7862c8"/><circle cx="23" cy="26" r="2" fill="#22c55e"/>
+      </svg>
+      <h1>Replica Lab</h1>
+      <span class="ver" id="verTag"></span>
+      <button class="mini upd" id="updChip" hidden>มีเวอร์ชันใหม่</button>
+    </div>
+    <div class="chip app-chip"><span class="k">แอปที่ลงสนาม</span><span class="v"><span id="appName">–</span> <button class="mini" id="appBtn">เปลี่ยนแอป</button></span></div>
+    <div class="chip energy" title="RAM ที่ทุก replica ใช้อยู่ เทียบกับ RAM ที่ Docker ใช้ได้">
+      <span class="k">พลังงาน (RAM)</span><span class="v" id="energyText">–</span><div class="ebar" id="energyBar"><i></i></div>
+    </div>
+    <div class="chip pop"><span class="k">ทีม (replica)</span><span class="v"><span id="sDesired">–</span><small> / <span id="maxText">–</span></small></span></div>
+    <div class="chip ready"><span class="k">พร้อมลุย</span><span class="v" id="sHealthy">–</span></div>
+    <div class="chip build"><span class="k">กำลังเกิด</span><span class="v" id="sStarting">–</span></div>
+    <div class="chip mis" title="นับเฉพาะในเบราว์เซอร์นี้"><span class="k">ภารกิจส่งซ้ำ</span><span class="v"><b id="mPass">0</b><small> ผ่าน </small><em id="mFail">0</em><small> ไม่ผ่าน</small></span></div>
+    <div class="clock"><span id="updated">กำลังโหลด…</span><br><span id="mUpdate"></span></div>
+  </header>
+
+  <!-- the team -->
+  <section class="sheet team" aria-labelledby="teamTitle">
+    <div class="head">
+      <h2 id="teamTitle">ทีมยูนิต<small>replica ของ service กดการ์ดเพื่อดู log</small></h2>
+      <span class="run-state" id="runState"></span>
+    </div>
+    <div class="bays" id="bays" aria-live="polite"></div>
+    <div class="scale-bar">
+      <div class="stepper" role="group" aria-label="จำนวน replica">
+        <button id="minus" title="ลด 1 ยูนิต" aria-label="ลด 1">−</button>
+        <input type="number" id="target" min="0" value="1" aria-label="จำนวน replica ที่ต้องการ">
+        <button id="plus" title="เพิ่ม 1 ยูนิต" aria-label="เพิ่ม 1">+</button>
+      </div>
+      <input type="range" id="range" min="0" value="1" aria-label="เลื่อนเพื่อเลือกจำนวน replica">
+      <button class="primary" id="apply">ปรับทีมเป็น <span id="applyN">1</span> ยูนิต</button>
+      <span class="spacer"></span>
+      <button id="startBtn">เริ่ม</button>
+      <button id="stopBtn">หยุด</button>
+    </div>
+    <div class="msg" id="scaleMsg"></div>
+  </section>
+
+  <div class="duo">
+    <!-- armory -->
+    <section class="sheet pad" aria-labelledby="armTitle">
+      <div class="head"><h2 id="armTitle">คลังยูนิต<small>image ที่ใช้สร้าง replica</small></h2></div>
+      <div class="row">
+        <select id="imageSel" style="flex:1 1 220px" aria-label="image ที่มีในเครื่อง"></select>
+        <button id="imageBtn">ใช้ image นี้</button>
+      </div>
+      <p class="hint" style="margin-top:8px">สลับแล้ว Swarm ทยอยเปลี่ยนทีละยูนิตโดยไม่หยุดบริการ</p>
+      <div id="buildBox" hidden>
+      <div class="divider"></div>
+      <div class="field"><span>สร้างรุ่นจากโค้ดในเครื่อง (build local รวมไฟล์ที่ยังไม่ commit)</span>
+        <select id="bRepo" aria-label="worktree ที่จะ build"><option value="">กำลังหา worktree…</option></select>
+        <input type="text" id="bRepoPath" spellcheck="false" placeholder="หรือวาง path ของ repo เช่น C:\Users\…\IdeaProjects\ramaservice">
+      </div>
+      <div class="row" style="margin-top:8px;gap:16px">
+        <label class="check"><input type="checkbox" id="bApply" checked> เสร็จแล้วใช้เลย</label>
+        <label class="check" title="ใช้ jar ใน target\ ที่ build ไว้แล้ว เช่นจาก IntelliJ"><input type="checkbox" id="bSkip"> ข้าม maven</label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" id="bBtn">Build</button>
+        <button id="bCancel" hidden>ยกเลิก</button>
+      </div>
+      <div class="msg" id="bMsg"></div>
+      <pre id="bLog" hidden></pre>
+      </div>
+      <div class="divider"></div>
+      <label class="field"><span>เรียกรุ่นใหม่จาก Harbor (project/repo:tag)</span>
+        <input type="text" id="pullRef" spellcheck="false" placeholder="newhis/ramaservice:775-feature-…" title="ใส่หรือไม่ใส่ harbor.rama.mahidol.ac.th/ ก็ได้">
+      </label>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" id="pullUseBtn">Pull แล้วใช้</button>
+        <button id="pullBtn">Pull อย่างเดียว</button>
+      </div>
+      <div class="msg" id="pullMsg"></div>
+      <div class="divider"></div>
+      <label class="field"><span>ประตูฐาน (port ที่ใช้เรียก service จากเครื่องนี้)</span>
+        <div class="row"><input type="number" id="portIn" min="1024" max="65535" style="width:110px"><button id="portBtn">เปลี่ยน port</button></div>
+      </label>
+      <div class="msg" id="portMsg"></div>
+      <div class="small">service <span id="mService" class="mono">–</span><br>image <span id="mImage" class="mono">–</span><br>เรียกได้ที่ <span id="mPorts">–</span></div>
+    </section>
+
+    <!-- missions -->
+    <section class="sheet pad" aria-labelledby="misTitle">
+      <div class="head">
+        <h2 id="misTitle">ภารกิจ<small>การทดสอบ</small></h2>
+        <div class="segmented" role="tablist" aria-label="ชนิดการทดสอบ">
+          <button role="tab" aria-selected="true" aria-controls="tabDup" id="tabDupBtn">ส่งซ้ำข้าม replica</button>
+          <button role="tab" aria-selected="false" aria-controls="tabLoad" id="tabLoadBtn">กระจายโหลด</button>
+        </div>
+      </div>
+      <div id="tabDup" role="tabpanel" aria-labelledby="tabDupBtn">
+        <p class="hint">ส่ง request เดียวกันหลายชุดพร้อมกัน ชุดที่ i ยิงตรงไปที่ยูนิตลำดับ i (วนตามจำนวนยูนิต) ภารกิจสำเร็จเมื่อทุกชุดได้ id เดียวกัน <code>{{run}}</code> คือรหัสสุ่มใหม่ทุกครั้งที่กด ข้อมูลถูกเขียนลง DB ที่แอปต่ออยู่จริง</p>
+        <div class="saved gap">
+          <label class="field" style="flex:1 1 220px"><span>ชุดทดสอบที่บันทึกไว้ของแอปนี้</span><select id="tSaved"><option value="">ยังไม่มี</option></select></label>
+          <label class="field" style="flex:1 1 180px"><span>ชื่อชุดทดสอบ</span><input type="text" id="tName" placeholder="เช่น vitalsign ไม่มี key" spellcheck="false"></label>
+          <button id="tSave">บันทึกชุดนี้</button>
+          <button class="quiet" id="tDel" title="ลบชุดที่เลือก">ลบ</button>
+        </div>
+        <div class="msg" id="tMsg" style="margin-top:4px"></div>
+        <div class="row" style="margin-top:6px">
+          <span class="small">ส่งแบบ</span>
+          <div class="segmented" role="tablist" aria-label="ชนิด request">
+            <button role="tab" aria-selected="true" id="mGql">GraphQL</button>
+            <button role="tab" aria-selected="false" id="mHttp">HTTP</button>
+          </div>
+        </div>
+        <div id="httpBox" hidden>
+          <div class="row gap">
+            <label class="field"><span>Method</span><select id="hMethod"><option>POST</option><option>PUT</option><option>PATCH</option><option>GET</option><option>DELETE</option></select></label>
+            <label class="field" style="flex:1 1 260px"><span>Path (ต่อจาก port ของแอป)</span><input type="text" id="hPath" spellcheck="false" placeholder="/PatientProfileWebService/api/save"></label>
+            <label class="field" style="flex:0 1 180px"><span>field id ในคำตอบ (เว้นว่าง = เดา)</span><input type="text" id="hIdPath" spellcheck="false" placeholder="id หรือ data.id"></label>
+          </div>
+          <div class="dup-grid">
+            <label class="field"><span>Headers (JSON)</span><textarea id="hHeaders" rows="4" spellcheck="false">{
+  "Content-Type": "application/json"
+}</textarea></label>
+            <label class="field"><span>Body</span><textarea id="hBody" rows="4" spellcheck="false">{
+  "ref": "SW{{run}}"
+}</textarea></label>
+          </div>
+        </div>
+        <div id="gqlBox">
+        <div class="field gap">
+          <span>เลือก mutation จาก schema ของ service ที่รันอยู่</span>
+          <div class="row">
+            <div class="combo" style="flex:1 1 260px">
+              <input type="text" id="dTpl" role="combobox" aria-expanded="false" aria-controls="dTplList" aria-autocomplete="list" autocomplete="off" spellcheck="false"
+                     placeholder="คลิกเพื่อเลือก หรือพิมพ์ค้นหา เช่น createVitalSign">
+              <div class="combo-list" id="dTplList" role="listbox" hidden></div>
+            </div>
+            <button class="mini" id="dSchemaReload" title="อ่าน schema ใหม่ (หลังเปลี่ยน image)">อ่าน schema ใหม่</button>
+          </div>
+          <div class="small" id="dSchemaInfo"></div>
+        </div>
+        <div class="dup-grid">
+          <label class="field"><span>Mutation</span><textarea id="dQuery" rows="5" spellcheck="false"></textarea></label>
+          <label class="field"><span>Variables (JSON)</span><textarea id="dVars" rows="5" spellcheck="false"></textarea></label>
+        </div>
+        </div>
+        <div class="opts">
+          <label class="field"><span>จำนวนชุด</span><input type="number" id="dCopies" value="6" min="2" max="50"></label>
+          <label class="field"><span>Idempotency-Key</span>
+            <select id="dKey">
+              <option value="none">ไม่ส่ง (ใช้ fallback 1 นาที)</option>
+              <option value="same">ส่ง key เดียวกันทุกชุด</option>
+              <option value="unique">key ต่างกันทุกชุด (ควรได้หลาย id)</option>
+            </select>
+          </label>
+          <label class="field"><span>เว้นระหว่างชุด (ms)</span><input type="number" id="dDelay" value="0" min="0" max="120000" style="width:100px"></label>
+          <button class="primary" id="dupBtn">ส่งภารกิจ</button>
+        </div>
+        <div class="msg" id="dupMsg"></div>
+        <div class="tablewrap" id="dupResult"></div>
+      </div>
+      <div id="tabLoad" role="tabpanel" aria-labelledby="tabLoadBtn" hidden>
+        <p class="hint" id="loadHint">ยิง <code>GET /actuator/info</code> ผ่าน VIP ของ service โดยเปิด connection ใหม่ทุกครั้ง แล้วนับจาก metrics ว่าแต่ละยูนิตรับไปกี่ request</p>
+        <div class="opts">
+          <label class="field"><span>จำนวน request</span><input type="number" id="lCount" value="300" min="1" max="5000" style="width:100px"></label>
+          <label class="field"><span>พร้อมกัน</span><input type="number" id="lConc" value="10" min="1" max="50"></label>
+          <button class="primary" id="loadBtn">ยิง</button>
+        </div>
+        <div class="msg" id="loadMsg"></div>
+        <div class="tablewrap" id="loadResult"></div>
+      </div>
+    </section>
+  </div>
+
+  <details class="sheet">
+    <summary><h2>รายงานยูนิต<small>รายละเอียดแต่ละ replica</small></h2></summary>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Slot</th><th>Task</th><th>สถานะ</th><th>Health</th><th>Liveness</th><th>Readiness</th><th>IP</th><th class="num">Heap MB</th><th class="num">RAM MB</th><th class="num">ms</th><th>เริ่มเมื่อ</th><th></th></tr></thead>
+        <tbody id="rows"><tr><td colspan="12" class="small">กำลังโหลด…</td></tr></tbody>
+      </table>
+    </div>
+  </details>
+  <details class="sheet">
+    <summary><h2>ยูนิตที่ออกจากทีม<small>task ที่จบไปล่าสุด</small></h2><span class="small" id="recentCount"></span></summary>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Slot</th><th>Task</th><th>สถานะ</th><th>ข้อความ</th><th>เวลา</th><th></th></tr></thead>
+        <tbody id="recent"></tbody>
+      </table>
+    </div>
+  </details>
+</main>
+
+<div class="switching" id="swOverlay" hidden role="alertdialog" aria-labelledby="swTitle" aria-live="polite">
+  <div class="sw-card">
+    <h2 id="swTitle">กำลังสลับแอป</h2>
+    <div class="sw-step" id="swStep">กำลังเริ่ม…</div>
+    <div class="sw-track"><i></i></div>
+    <div class="small" id="swTime"></div>
+    <pre id="swLog"></pre>
+    <div class="row" id="swActions" hidden><button class="primary" id="swClose">ปิด</button></div>
+  </div>
+</div>
+<div class="scrim" id="aboutScrim" hidden></div>
+<aside id="aboutCard" class="drawer" hidden aria-labelledby="aboutTitle" role="dialog">
+  <div class="head"><h2 id="aboutTitle">เกี่ยวกับ Replica Lab</h2><button class="quiet" id="aboutClose">ปิด</button></div>
+  <p class="hint" style="margin:0 0 12px">รันแอปจาก image ในเครื่องเป็นหลาย replica บน Docker Swarm ปรับจำนวนขึ้นลง ดู log ทีละตัว และทดสอบส่งซ้ำข้าม replica</p>
+  <dl class="sel">
+    <dt>เวอร์ชัน</dt><dd id="aVersion">–</dd>
+    <dt>Docker</dt><dd id="aDocker">–</dd>
+    <dt>Node.js</dt><dd id="aNode">–</dd>
+    <dt>โฟลเดอร์โปรแกรม</dt><dd id="aFolder" class="mono">–</dd>
+    <dt>แหล่งอัปเดต</dt><dd id="aRepo">–</dd>
+  </dl>
+  <div class="divider"></div>
+  <h2 style="font-size:16px">อัปเดต</h2>
+  <div class="msg" id="uMsg">ยังไม่ได้เช็ค</div>
+  <pre class="notes" id="uNotes" hidden></pre>
+  <div class="row gap">
+    <button id="uCheck">เช็คอัปเดต</button>
+    <button class="primary" id="uApply" hidden>อัปเดต</button>
+  </div>
+  <details class="gap">
+    <summary class="small" style="cursor:pointer">repo เป็นแบบส่วนตัว? ใส่ GitHub token ของเครื่องนี้</summary>
+    <div class="row" style="margin-top:8px">
+      <input type="password" id="uToken" placeholder="ghp_… (สิทธิ์อ่าน repo พอ)" style="flex:1 1 240px" autocomplete="off">
+      <button id="uTokenSave">บันทึก token</button>
+    </div>
+    <div class="small" id="uTokenInfo">เก็บไว้ที่ config\github-token.txt ของเครื่องนี้เท่านั้น ไม่ขึ้น git</div>
+  </details>
+  <div class="divider"></div>
+  <h2 style="font-size:16px">สิ่งที่มีในเวอร์ชันนี้</h2>
+  <pre class="notes" id="aChangelog"></pre>
+  <p class="small">หลักเลขเวอร์ชัน: แก้บั๊ก = เลขท้าย (1.0.1), เพิ่มความสามารถ = เลขกลาง (1.1.0), เปลี่ยนแบบที่ของเดิมใช้ไม่ได้ = เลขหน้า (2.0.0) อัปเดตไม่แตะ config\ และ apps\*.local.env และไม่ทับโปรไฟล์แอปที่มีอยู่</p>
+</aside>
+<div class="scrim" id="appScrim" hidden></div>
+<aside id="appCard" class="drawer" hidden aria-labelledby="appTitle" role="dialog">
+  <div class="head"><h2 id="appTitle">แอป<small>รันได้ทีละแอป สลับแล้วแอปเดิมหยุดและจำค่าไว้</small></h2><button class="quiet" id="appClose">ปิด</button></div>
+  <div id="appList" class="app-list"></div>
+  <div class="divider"></div>
+  <h2 style="font-size:16px">service ที่รันอยู่ใน swarm ของเครื่องนี้</h2>
+  <p class="hint" style="margin:4px 0 10px">service อื่นที่ไม่ได้สร้างจาก Replica Lab กด "นำเข้า" เพื่อสร้างแอปจากค่าของ service นั้น (image, port, healthcheck, env) แล้วตรวจในฟอร์มด้านล่างก่อนบันทึก service เดิมยังรันต่อตามปกติ</p>
+  <div id="swarmList" class="app-list"></div>
+  <div class="divider"></div>
+  <h2 style="font-size:16px">สร้าง image จากโฟลเดอร์โปรเจกต์</h2>
+  <p class="hint" style="margin:4px 0 10px">วาง path ของโปรเจกต์ที่มี Dockerfile แล้วกด Build ได้ image ในเครื่อง จากนั้นฟอร์มเพิ่มแอปด้านล่างจะกรอกให้เอง</p>
+  <div class="row">
+    <input type="text" id="fDir" list="fRecent" spellcheck="false" placeholder="เช่น C:\Users\…\IdeaProjects\his-legacy-support" style="flex:1 1 300px">
+    <datalist id="fRecent"></datalist>
+    <button id="fInspect">ตรวจโฟลเดอร์</button>
+  </div>
+  <div class="form-grid gap" id="fForm" hidden>
+    <label class="field"><span>Dockerfile</span><select id="fDockerfile"></select></label>
+    <label class="field" style="grid-column: span 2"><span>ชื่อ image ที่จะได้</span><input type="text" id="fTag" spellcheck="false"></label>
+  </div>
+  <div class="small" id="fInfo" style="margin-top:6px"></div>
+  <div class="row gap" id="fActs" hidden>
+    <button class="primary" id="fBuild">Build image</button>
+    <button id="fCancel" hidden>ยกเลิก</button>
+    <button id="fRestart" hidden title="แอปที่ลงสนามใช้ image ชื่อนี้อยู่ Swarm ไม่เปลี่ยนเองเมื่อชื่อเดิม">รีสตาร์ท replica ด้วย image ใหม่</button>
+  </div>
+  <div class="msg" id="fMsg"></div>
+  <pre id="fLog" hidden></pre>
+  <div class="divider"></div>
+  <h2 id="formTitle" style="font-size:16px">เพิ่มแอปจาก image ในเครื่อง</h2>
+  <p class="hint" style="margin:4px 0 10px">ทีม build image ไว้ในเครื่อง (docker build) แล้วเลือกที่นี่ ค่าจะถูกใส่ให้ทันที (ชื่อตาม image, port 8080, RAM อัตโนมัติ) แล้วปรับให้แม่นขึ้นจาก LABEL rama.lab.* หรือหน้าตา image (Tomcat/WAR, Spring Boot) แก้ได้ก่อนบันทึก</p>
+  <div class="row">
+    <select id="nImage" style="flex:1 1 260px" aria-label="image ในเครื่อง"><option value="">กำลังอ่าน image…</option></select>
+    <button id="nDetect" title="ดู image อีกครั้งแล้วใส่ค่าใหม่">เดาค่าใหม่</button>
+  </div>
+  <div class="small" id="nNotes" style="margin-top:6px"></div>
+  <div class="form-grid gap">
+    <label class="field"><span>ชื่อ (a-z 0-9 -)</span><input type="text" id="nName" spellcheck="false"></label>
+    <label class="field"><span>ชื่อที่แสดง</span><input type="text" id="nTitle"></label>
+    <label class="field"><span>ชนิด</span><select id="nKind"><option value="tomcat">Tomcat / WAR</option><option value="spring">Spring Boot (actuator)</option><option value="http">อื่นๆ (HTTP)</option></select></label>
+    <label class="field"><span>Port ในแอป</span><input type="number" id="nPort"></label>
+    <label class="field"><span>Port บนเครื่อง</span><input type="number" id="nHostPort"></label>
+    <label class="field"><span>Health path (ต้องตอบ 200)</span><input type="text" id="nHealth" spellcheck="false"></label>
+    <label class="field"><span>รอเริ่ม (วินาที)</span><input type="number" id="nStart"></label>
+    <label class="field"><span>RAM ต่อ replica (MB)</span><input type="number" id="nMem" min="256" max="4096">
+      <span class="check" style="margin-top:2px"><input type="checkbox" id="nMemAuto"> อัตโนมัติ (วัดก่อนขึ้น)</span></label>
+    <label class="field"><span>ทดสอบส่งซ้ำแบบ</span><select id="nTest"><option value="http">HTTP</option><option value="graphql">GraphQL</option></select></label>
+  </div>
+  <label class="field gap"><span>Environment (KEY=value ทีละบรรทัด ส่งเข้า container)</span><textarea id="nEnv" rows="4" spellcheck="false" placeholder="JAVA_OPTS=-Xmx512m"></textarea></label>
+  <input type="hidden" id="nImageVal"><input type="hidden" id="nBuild">
+  <div class="row gap">
+    <button class="primary" id="nSaveUse">บันทึกแล้วใช้เลย</button>
+    <button id="nSave">บันทึกอย่างเดียว</button>
+  </div>
+  <div class="msg" id="appMsg"></div>
+  <pre id="appLog" hidden></pre>
+</aside>
+
+<div class="scrim" id="logScrim" hidden></div>
+<aside id="logCard" hidden aria-labelledby="logTitle" role="dialog">
+  <div class="head"><h2 id="logTitle">Log</h2><button class="quiet" id="logClose">ปิด</button></div>
+  <div class="row">
+    <select id="logTail" aria-label="จำนวนบรรทัดล่าสุด"><option value="200">200 บรรทัด</option><option value="500" selected>500 บรรทัด</option><option value="2000">2,000 บรรทัด</option><option value="10000">10,000 บรรทัด</option></select>
+    <input type="text" id="logFilter" placeholder="กรองคำ เช่น ERROR, Idempotency, traceId" spellcheck="false" style="flex:1 1 200px">
+    <button id="logRefresh">โหลดใหม่</button>
+  </div>
+  <div class="row" style="gap:16px">
+    <label class="check"><input type="checkbox" id="logErr"> ERROR/WARN เท่านั้น</label>
+    <label class="check"><input type="checkbox" id="logAuto" checked> อัปเดตทุก 3 วินาที</label>
+    <a id="logOpen" target="_blank" style="font-size:13px;margin-left:auto">เปิดเป็นข้อความในแท็บใหม่</a>
+  </div>
+  <div id="logInfo"></div>
+  <pre id="logBox"></pre>
+</aside>
+
+<script>
+const $ = id => document.getElementById(id);
+let max = 5, desired = null, busy = false, dirty = false, lastStatus = null;
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ago = iso => {
+  if (!iso) return "–";
+  const s = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
+  if (s < 60) return s + " วิ";
+  if (s < 3600) return Math.floor(s / 60) + " นาที " + (s % 60) + " วิ";
+  return Math.floor(s / 3600) + " ชม. " + Math.floor((s % 3600) / 60) + " นาที";
+};
+const pill = (text, kind) => `<span class="pill ${kind}">${esc(text)}</span>`;
+const upPill = v => !v ? "–" : v === "UP" ? pill("UP", "ok") : /OUT_OF_SERVICE|DOWN/.test(v) ? pill(v, "bad") : pill(v, "warn");
+function healthPill(r) {
+  const h = r.container?.health;
+  if (r.state !== "running") return "–";
+  if (h === "healthy") return pill("healthy", "ok");
+  if (h === "starting") return pill("starting", "warn");
+  if (h === "unhealthy") return pill("unhealthy", "bad");
+  return h ? pill(h, "idle") : "–";
+}
+function statePill(s) {
+  if (s === "running") return pill("running", "ok");
+  if (["failed", "rejected", "orphaned"].includes(s)) return pill(s, "bad");
+  if (["shutdown", "complete", "remove"].includes(s)) return pill(s, "idle");
+  return pill(s || "?", "warn");
+}
+async function postJson(url, body) {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+const logBtn = x => x.containerId ? `<button class="mini" data-log="${esc(x.containerId)}" data-slot="${x.slot ?? ""}" data-task="${esc(x.taskId)}">ดู log</button>` : "";
+
+// ---------- the team: one card per slot ----------
+const STATE_TEXT = { ok: "พร้อมลุย", starting: "กำลังเกิด", bad: "บาดเจ็บ (มีปัญหา)", pending: "รอเกิด", empty: "ช่องว่าง" };
+const HEAP_MAX_MB = 840, BOOT_S = 180;
+function unitKind(r) {
+  if (!r) return null;
+  const h = r.container?.health;
+  if (["failed", "rejected", "orphaned"].includes(r.state) || h === "unhealthy") return "bad";
+  if (r.state === "running" && (h === "healthy" || !h)) return "ok";
+  return "starting";
+}
+const hpBlocks = n => `<div class="hp">${Array.from({ length: 10 }, (_, i) => `<i class="${i < n ? "on" : ""}"></i>`).join("")}</div>`;
+function renderRack() {
+  const st = lastStatus;
+  if (!st) return;
+  const target = Number($("target").value);
+  const out = [];
+  for (let s = 1; s <= st.max; s++) {
+    const r = st.replicas.find(x => x.slot === s);
+    const kind = unitKind(r) || (s <= st.desired ? "pending" : "empty");
+    let label = STATE_TEXT[kind], extra = "";
+    if (dirty && s > st.desired && s <= target) { extra = " will-add"; label = "จะเพิ่ม"; }
+    if (dirty && s <= st.desired && s > target) { extra = " will-remove"; label = "จะออก"; }
+    if (!r) {
+      out.push(`<button class="unit ${kind}${extra}" data-pad="${s}" title="ตั้งทีมเป็น ${s} ยูนิต"><div class="band"><span>${esc(label)}</span></div>
+        <div class="badge">${s}</div>${kind === "empty" && !extra ? `<div class="plus">+ เพิ่มยูนิต</div>` : `<div class="plus"></div>`}</button>`);
+      continue;
+    }
+    let meters = "";
+    if (kind === "starting" && r.since) {
+      const pct = Math.min(100, Math.round(100 * (Date.now() - Date.parse(r.since)) / 1000 / BOOT_S));
+      label += " " + pct + "%";
+      meters = `<div class="meter" title="กำลังบูต ${pct}% ของ start-period"><span>BOOT</span>${hpBlocks(Math.round(pct / 10))}</div>`;
+    } else if (r.state === "running") {
+      // energy: heap on Spring apps, otherwise the container's RAM against its limit
+      const useHeap = r.heapMb != null;
+      const en = useHeap ? Math.min(100, Math.round(100 * r.heapMb / HEAP_MAX_MB))
+                         : (r.memMb != null && st.unitLimitMb ? Math.min(100, Math.round(100 * r.memMb / st.unitLimitMb)) : 0);
+      meters = `<div class="meter" title="HP = health"><span>HP</span>${hpBlocks(kind === "ok" ? 10 : 2)}</div>
+        <div class="meter" title="${useHeap ? `พลังงาน = heap ${r.heapMb} MB` : `พลังงาน = RAM ${r.memMb ?? "–"} / ${st.unitLimitMb ?? "–"} MB`}"><span>EN</span><div class="en"><i style="width:${en}%"></i></div></div>`;
+    }
+    out.push(`<button class="unit ${kind}${extra}" data-log="${esc(r.containerId || "")}" data-slot="${s}" data-task="${esc(r.taskId)}" title="ดู log ของ slot ${s}">
+      <div class="band"><span>${esc(label)}</span><span class="hint-log" style="color:#fff">log</span></div>
+      <div class="badge">${s}</div>
+      <div class="body"><div class="who">SLOT ${s}</div>${meters}
+        <div class="facts"><span>${r.heapMb != null ? r.heapMb + " MB" : r.memMb != null ? r.memMb + " MB RAM" : "–"}</span><span>${r.reachable ? r.latencyMs + " ms" : "–"}</span></div>
+        <div class="task">${esc(r.taskId)}</div></div></button>`);
+  }
+  $("bays").innerHTML = out.join("");
+}
+$("bays").addEventListener("click", e => {
+  const pad = e.target.closest("[data-pad]");
+  if (pad) setTarget(Number(pad.dataset.pad), true);
+});
+function flow(on) { $("bays").classList.toggle("busy", on); }
+function floatOver(slot, text) {
+  const card = $("bays").querySelector(`.unit[data-slot="${slot}"]`);
+  if (!card) return;
+  const el = document.createElement("div");
+  el.className = "float"; el.textContent = text;
+  card.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+// ---------- status ----------
+function setTarget(n, fromUser) {
+  n = Math.max(0, Math.min(max, Number(n) || 0));
+  $("target").value = n; $("range").value = n; $("applyN").textContent = n;
+  if (fromUser) dirty = n !== desired;
+  $("apply").disabled = busy || n === desired;
+  renderRack();
+}
+let portDirty = false;
+async function refresh() {
+  try {
+    const r = await fetch("/api/status");
+    const st = await r.json();
+    if (!r.ok) throw new Error(st.error || r.status);
+    max = st.max; desired = st.desired; lastStatus = st;
+    if (st.app && st.app.name !== APP?.name) onAppChanged(st.app);
+    if (st.version) $("verTag").textContent = "v" + st.version;
+    $("target").max = max; $("range").max = max; $("maxText").textContent = max;
+    $("sDesired").textContent = st.desired;
+    $("sHealthy").textContent = st.healthy;
+    $("sStarting").textContent = st.replicas.filter(x => unitKind(x) === "starting").length;
+    const used = st.replicas.reduce((a, x) => a + (x.memMb || 0), 0);
+    if (st.nodeMemMb) {
+      const pct = Math.min(100, Math.round(100 * used / st.nodeMemMb));
+      $("energyText").innerHTML = `${(used / 1024).toFixed(1)}<small> / ${(st.nodeMemMb / 1024).toFixed(1)} GB</small>`;
+      $("energyBar").firstElementChild.style.width = pct + "%";
+      $("energyBar").classList.toggle("hot", pct > 75);
+    }
+    $("mService").textContent = st.service;
+    if ($("mImage").textContent !== st.image) { $("mImage").textContent = st.image; loadImages(); }
+    $("runState").textContent = st.desired === 0 ? "หยุดพักอยู่" + (st.lastReplicas ? ` กดเริ่มแล้วจะกลับมา ${st.lastReplicas} ยูนิต` : "") : `ลงสนาม ${st.desired} จากสูงสุด ${st.max} ยูนิต`;
+    $("startBtn").disabled = busy || st.desired > 0;
+    $("stopBtn").disabled = busy || st.desired === 0;
+    const pub = Number((st.publishedPorts[0] || "").split("->")[0]) || "";
+    $("mPorts").innerHTML = pub ? `<a href="http://localhost:${pub}/actuator/health" target="_blank">localhost:${pub}</a>` : "–";
+    if (document.activeElement !== $("portIn") && !portDirty) $("portIn").value = pub;
+    $("portBtn").disabled = busy || !$("portIn").value || Number($("portIn").value) === pub;
+    $("mUpdate").textContent = st.updateStatus ? `rolling update: ${st.updateStatus.State}` : "";
+    if (!dirty) setTarget(desired, false); else setTarget($("target").value, true);
+    $("rows").innerHTML = st.replicas.length ? st.replicas.map(x => `<tr>
+      <td class="num">${x.slot}</td><td class="mono">${esc(x.taskId)}</td>
+      <td>${statePill(x.state)}${x.message && x.state !== "running" ? `<div class="small">${esc(x.message)}</div>` : ""}</td>
+      <td>${healthPill(x)}</td><td>${upPill(x.liveness)}</td><td>${upPill(x.readiness)}</td>
+      <td class="mono">${esc(x.ip || "–")}</td><td class="num">${x.heapMb ?? "–"}</td><td class="num">${x.memMb ?? "–"}</td>
+      <td class="num">${x.reachable ? x.latencyMs : "–"}</td><td>${ago(x.since)}</td><td>${logBtn(x)}</td></tr>`).join("")
+      : `<tr><td colspan="12" class="small">ไม่มียูนิต (ตั้งไว้ 0)</td></tr>`;
+    $("recent").innerHTML = st.recent.length ? st.recent.map(x => `<tr>
+      <td class="num">${x.slot ?? "–"}</td><td class="mono">${esc(x.taskId)}</td><td>${statePill(x.state)}</td>
+      <td class="small">${esc(x.message)}</td><td>${ago(x.at)}</td><td>${logBtn(x)}</td></tr>`).join("") : `<tr><td colspan="6" class="small">ยังไม่มี</td></tr>`;
+    $("recentCount").textContent = st.recent.length ? st.recent.length + " รายการ" : "";
+    $("updated").textContent = "อัปเดต " + new Date(st.now).toLocaleTimeString("th-TH");
+  } catch (e) {
+    $("updated").textContent = "อ่านสถานะไม่ได้: " + e.message;
+  }
+}
+
+// ---------- orders ----------
+async function runAction(label, fn) {
+  busy = true; $("scaleMsg").className = "msg"; $("scaleMsg").textContent = label + " …";
+  try { $("scaleMsg").textContent = await fn(); dirty = false; }
+  catch (e) { $("scaleMsg").className = "msg err"; $("scaleMsg").textContent = label + " ไม่ได้: " + e.message; }
+  finally { busy = false; await refresh(); }
+}
+$("apply").onclick = () => {
+  const n = Number($("target").value);
+  runAction("กำลังปรับทีม", async () => { await postJson("/api/scale", { replicas: n }); return `รับคำสั่งแล้ว ปรับทีมเป็น ${n} ยูนิต`; });
+};
+$("startBtn").onclick = () => runAction("กำลังเริ่ม", async () => "เริ่มแล้ว " + (await postJson("/api/start")).replicas + " ยูนิต");
+$("stopBtn").onclick = () => runAction("กำลังหยุด", async () => { const j = await postJson("/api/stop"); return "หยุดแล้ว กดเริ่มจะกลับมา " + (j.remembered || 2) + " ยูนิต"; });
+$("minus").onclick = () => setTarget(Number($("target").value) - 1, true);
+$("plus").onclick = () => setTarget(Number($("target").value) + 1, true);
+$("target").oninput = e => setTarget(e.target.value, true);
+$("range").oninput = e => setTarget(e.target.value, true);
+
+// ---------- armory: images ----------
+$("imageBtn").onclick = () => {
+  const img = $("imageSel").value;
+  runAction("กำลังเปลี่ยน image", async () => { await postJson("/api/image", { image: img }); return "เปลี่ยนเป็น " + img + " แล้ว Swarm จะทยอยเปลี่ยนทีละยูนิต"; });
+};
+async function loadImages() {
+  try {
+    const list = await (await fetch("/api/images")).json();
+    const cur = $("mImage").textContent;
+    $("imageSel").innerHTML = list.map(i => `<option value="${esc(i.image)}"${i.image === cur ? " selected" : ""}>${esc(i.image)}  (${new Date(i.created).toLocaleDateString("th-TH")})</option>`).join("");
+  } catch { /* keep the old list */ }
+}
+let pullTimer = null;
+async function pullStatus() {
+  try {
+    const j = await (await fetch("/api/pull")).json();
+    if (!j.image) return;
+    const layers = j.layers ? ` (layer ${j.layersDone}/${j.layers})` : "";
+    $("pullMsg").className = "msg" + (j.state === "error" ? " err" : "");
+    $("pullMsg").textContent = `${j.image}: ${j.state === "pulling" ? "กำลัง pull" : j.state === "done" ? "เสร็จ" : "ไม่สำเร็จ"} ${j.message || ""}${j.state === "pulling" ? layers : ""}`;
+    const pulling = j.state === "pulling";
+    $("pullBtn").disabled = $("pullUseBtn").disabled = pulling;
+    if (!pulling && pullTimer) { clearInterval(pullTimer); pullTimer = null; loadImages(); refresh(); }
+  } catch { /* scaler restarting */ }
+}
+async function pull(apply) {
+  const ref = $("pullRef").value.trim();
+  if (!ref) { $("pullMsg").className = "msg err"; $("pullMsg").textContent = "ใส่ชื่อ image ก่อน เช่น newhis/ramaservice:<tag>"; return; }
+  try {
+    const j = await postJson("/api/pull", { image: ref, apply });
+    $("pullMsg").className = "msg"; $("pullMsg").textContent = "เริ่ม pull " + j.image + (apply ? " เสร็จแล้วจะเปลี่ยน image ให้" : "");
+    if (!pullTimer) pullTimer = setInterval(pullStatus, 1500);
+  } catch (e) { $("pullMsg").className = "msg err"; $("pullMsg").textContent = "pull ไม่ได้: " + e.message; }
+}
+$("pullBtn").onclick = () => pull(false);
+$("pullUseBtn").onclick = () => pull(true);
+$("pullRef").onkeydown = e => { if (e.key === "Enter") pull(true); };
+pullStatus().then(() => { if ($("pullBtn").disabled && !pullTimer) pullTimer = setInterval(pullStatus, 1500); });
+
+$("portIn").oninput = () => { portDirty = true; $("portBtn").disabled = !$("portIn").value; };
+$("portBtn").onclick = async () => {
+  const p = Number($("portIn").value);
+  busy = true; $("portBtn").disabled = true;
+  $("portMsg").className = "msg"; $("portMsg").textContent = `กำลังย้ายประตูไป ${p} (สร้าง service ใหม่ ยูนิตจะเริ่มใหม่ประมาณ 1 นาที) …`;
+  try {
+    await postJson("/api/port", { port: p });
+    portDirty = false;
+    $("portMsg").textContent = `ย้ายแล้ว เรียก service ได้ที่ http://localhost:${p} เมื่อยูนิตพร้อมลุย`;
+  } catch (e) { $("portMsg").className = "msg err"; $("portMsg").textContent = "เปลี่ยนไม่ได้: " + e.message; }
+  finally { busy = false; refresh(); }
+};
+
+// ---------- armory: build local (helper on this PC, started by start.cmd / OffLab) ----------
+const BUILDER = `http://${location.hostname}:18091`;
+async function builder(method, p, body) {
+  const r = await fetch(BUILDER + p, { method, headers: { "X-Replica-Lab": "1", ...(body ? { "Content-Type": "application/json" } : {}) },
+                                        body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+let buildTimer = null, builderUp = false;
+async function loadRepos() {
+  try {
+    const j = await builder("GET", "/repos");
+    builderUp = true;
+    const opts = j.worktrees.map(w => `<option value="${esc(w.path)}"${w.path.toLowerCase() === (j.last || "").toLowerCase() ? " selected" : ""}>${esc(w.branch || "(no branch)")}${w.changed ? `  (แก้ค้าง ${w.changed} ไฟล์)` : ""}  ${esc(w.path)}</option>`);
+    $("bRepo").innerHTML = opts.length ? opts.join("") + `<option value="">ใส่ path เอง</option>` : `<option value="">ยังไม่เคย build ใส่ path ของ repo ด้านล่าง</option>`;
+    if (!$("bRepoPath").value) $("bRepoPath").value = $("bRepo").value || j.last || "";
+    if (!buildTimer) $("bBtn").disabled = false;
+    if ($("bMsg").dataset.down) { $("bMsg").textContent = ""; delete $("bMsg").dataset.down; }
+  } catch {
+    builderUp = false;
+    $("bRepo").innerHTML = `<option value="">ตัวช่วย build ไม่ทำงาน</option>`;
+    $("bBtn").disabled = true;
+    $("bMsg").className = "msg err"; $("bMsg").dataset.down = "1";
+    $("bMsg").textContent = "ตัวช่วย build บนเครื่องนี้ยังไม่ทำงาน: เปิด Replica Lab ใหม่จาก OffLab หรือ start.cmd (ต้องมี Node)";
+  }
+}
+$("bRepo").onchange = e => { if (e.target.value) $("bRepoPath").value = e.target.value; else $("bRepoPath").focus(); };
+function showBuild(j) {
+  if (!j || !j.state) return;
+  const running = j.state === "running";
+  $("bBtn").disabled = running || !builderUp; $("bCancel").hidden = !running;
+  const tagLine = j.lines.find(l => l.startsWith("image ")) || "";
+  const text = { running: "กำลัง build", done: "build เสร็จ", error: "build ไม่สำเร็จ", cancelled: "ยกเลิกแล้ว" }[j.state];
+  $("bMsg").className = "msg" + (j.state === "error" ? " err" : "");
+  $("bMsg").textContent = `${text} ${tagLine.replace(/^image\s+/, "")}${j.state === "done" && j.apply ? " และสั่งเปลี่ยน image แล้ว" : ""}`;
+  const box = $("bLog");
+  box.hidden = false;
+  box.innerHTML = j.lines.map(l => /ERROR|failed|Exception/i.test(l) ? `<span class="e">${esc(l)}</span>` : esc(l)).join("\n");
+  box.scrollTop = box.scrollHeight;
+  if (!running && buildTimer) { clearInterval(buildTimer); buildTimer = null; loadImages(); loadRepos(); refresh(); }
+}
+async function pollBuild() { try { showBuild(await builder("GET", "/build")); } catch { /* helper restarting */ } }
+$("bBtn").onclick = async () => {
+  const repo = $("bRepoPath").value.trim();
+  if (!repo) { $("bMsg").className = "msg err"; $("bMsg").textContent = "เลือก worktree หรือใส่ path ของ repo ก่อน"; return; }
+  try {
+    showBuild(await builder("POST", "/build", { repo, skipMaven: $("bSkip").checked, apply: $("bApply").checked }));
+    if (!buildTimer) buildTimer = setInterval(pollBuild, 1500);
+  } catch (e) { $("bMsg").className = "msg err"; $("bMsg").textContent = "build ไม่ได้: " + e.message; }
+};
+$("bCancel").onclick = async () => { try { showBuild(await builder("POST", "/cancel")); } catch (e) { $("bMsg").textContent = e.message; } };
+loadRepos().then(async () => {
+  if (!builderUp) return;
+  const j = await builder("GET", "/build").catch(() => null);
+  if (j?.state) { showBuild(j); if (j.state === "running" && !buildTimer) buildTimer = setInterval(pollBuild, 1500); }
+});
+setInterval(() => { if (!builderUp) loadRepos(); }, 10000);
+
+// ---------- missions ----------
+for (const btn of ["tabDupBtn", "tabLoadBtn"]) {
+  $(btn).onclick = () => {
+    for (const [b, p] of [["tabDupBtn", "tabDup"], ["tabLoadBtn", "tabLoad"]]) { $(b).setAttribute("aria-selected", String(b === btn)); $(p).hidden = b !== btn; }
+  };
+}
+let missions = { pass: 0, fail: 0 };
+try { missions = JSON.parse(localStorage.getItem("replicalab.missions")) || missions; } catch { /* private window */ }
+function showMissions() { $("mPass").textContent = missions.pass; $("mFail").textContent = missions.fail; }
+showMissions();
+
+const TEMPLATES = {
+  vitalsign: {
+    name: "createVitalSign",
+    query: "mutation($input: VitalSignInput!) {\n  createVitalSign(input: $input) { id mrn transactionId code result }\n}",
+    vars: { input: { mrn: "SW{{run}}", transactionId: "TX-SW{{run}}", code: "BT", result: "37.0", unit: "Cel" } },
+  },
+  documentRequest: {
+    name: "createDocumentRequest",
+    query: "mutation($input: DocumentRequestInput!) {\n  createDocumentRequest(input: $input) { id mrn encounterId }\n}",
+    vars: { input: { mrn: "SW{{run}}", encounterId: "ENC-SW{{run}}", referenceToType: "user", referenceTo: "swarm-dup-test" } },
+  },
+};
+function useTemplate(k) { const t = TEMPLATES[k]; if (!t) return; $("dQuery").value = t.query; $("dVars").value = JSON.stringify(t.vars, null, 2); $("dTpl").value = t.name; }
+useTemplate("vitalsign");
+
+// ---------- mutation picker (schema from /api/schema = introspection of the running image) ----------
+// create mutations that carry @IdempotentMutation in ramaservice (#767 / #780)
+const IDEMPOTENT = new Set(["createVitalSign", "createDocument", "createDocumentAssignment", "createDocumentRequest", "createEncounter", "registerPatient"]);
+let gql = null, pickItems = [], pickIndex = -1, pickFilter = "";
+const typeStr = t => t.kind === "NON_NULL" ? typeStr(t.ofType) + "!" : t.kind === "LIST" ? `[${typeStr(t.ofType)}]` : t.name;
+const baseType = t => (t.kind === "NON_NULL" || t.kind === "LIST") ? baseType(t.ofType) : t;
+const groupOf = m => IDEMPOTENT.has(m.name) ? 0 : /^(create|register|add|save|new)/i.test(m.name) ? 1 : 2;
+const GROUPS = [["มีกันซ้ำ (@IdempotentMutation)", ""], ["สร้างข้อมูล", ""], ["แก้ / ลบ / อื่นๆ ระวัง: เปลี่ยนข้อมูลจริงใน DB", "warn"]];
+
+async function loadSchema(refresh) {
+  $("dSchemaInfo").textContent = "กำลังอ่าน schema…";
+  try {
+    const r = await fetch("/api/schema" + (refresh ? "?refresh=1" : ""));
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.status);
+    gql = j;
+    $("dSchemaInfo").textContent = `${j.mutations.length} mutation จาก ${j.image}`;
+    if (!$("dTplList").hidden) renderPicker();
+  } catch (e) { $("dSchemaInfo").textContent = "อ่าน schema ไม่ได้: " + e.message; }
+}
+function renderPicker() {
+  const list = $("dTplList");
+  if (!gql) { list.innerHTML = `<div class="combo-empty">ยังอ่าน schema ไม่ได้ ${esc($("dSchemaInfo").textContent)}</div>`; return; }
+  const q = pickFilter.trim().toLowerCase();
+  const shown = gql.mutations.filter(m => !q || m.name.toLowerCase().includes(q))
+    .sort((a, b) => groupOf(a) - groupOf(b) || a.name.localeCompare(b.name));
+  pickItems = shown;
+  if (pickIndex >= shown.length) pickIndex = shown.length - 1;
+  let html = "", g = -1;
+  shown.forEach((m, i) => {
+    const gi = groupOf(m);
+    if (gi !== g) { g = gi; html += `<div class="combo-group ${GROUPS[gi][1]}">${GROUPS[gi][0]}</div>`; }
+    const args = m.args.map(a => `${a.name}: ${typeStr(a.type)}`).join(", ");
+    html += `<div class="combo-item" role="option" id="opt${i}" data-i="${i}" aria-selected="${i === pickIndex}">
+      <b>${esc(m.name)}</b>${gi === 0 ? `<span class="tag safe">กันซ้ำ</span>` : gi === 2 ? `<span class="tag danger">เปลี่ยนข้อมูล</span>` : ""}
+      <small>(${esc(args)}): ${esc(typeStr(m.type))}</small></div>`;
+  });
+  list.innerHTML = html || `<div class="combo-empty">ไม่พบ mutation ที่ตรงกับ "${esc(q)}"</div>`;
+  if (pickIndex >= 0) $("opt" + pickIndex)?.scrollIntoView({ block: "nearest" });
+}
+const TEMPLATES_BY_NAME = Object.fromEntries(Object.entries(TEMPLATES).map(([k, t]) => [t.name, k]));
+function openPicker(typing) {
+  if (!typing && $("dTplList").hidden) pickFilter = "";
+  $("dTplList").hidden = false; $("dTpl").setAttribute("aria-expanded", "true");
+  if (!gql) loadSchema(false);
+  renderPicker();
+}
+function closePicker() { $("dTplList").hidden = true; $("dTpl").setAttribute("aria-expanded", "false"); pickIndex = -1; }
+$("dTpl").addEventListener("focus", () => { $("dTpl").select(); openPicker(false); });
+$("dTpl").addEventListener("click", () => openPicker(false));
+$("dTpl").addEventListener("input", () => { pickFilter = $("dTpl").value; pickIndex = 0; openPicker(true); });
+$("dTpl").addEventListener("keydown", e => {
+  if ($("dTplList").hidden && (e.key === "ArrowDown" || e.key === "Enter")) { openPicker(false); e.preventDefault(); return; }
+  if (e.key === "ArrowDown") { pickIndex = Math.min(pickItems.length - 1, pickIndex + 1); renderPicker(); e.preventDefault(); }
+  else if (e.key === "ArrowUp") { pickIndex = Math.max(0, pickIndex - 1); renderPicker(); e.preventDefault(); }
+  else if (e.key === "Enter") { if (pickItems[pickIndex]) pickMutation(pickItems[pickIndex]); e.preventDefault(); }
+  else if (e.key === "Escape") { closePicker(); }
+});
+$("dTplList").addEventListener("mousedown", e => {      // mousedown: before the input loses focus
+  const it = e.target.closest(".combo-item");
+  if (it) { e.preventDefault(); pickMutation(pickItems[Number(it.dataset.i)]); }
+});
+document.addEventListener("mousedown", e => { if (!e.target.closest(".combo")) closePicker(); });
+$("dSchemaReload").onclick = () => loadSchema(true);
+
+// sample value for a type; {{run}} on fields that identify a record, so every run starts fresh
+function sample(t, field, depth) {
+  if (t.kind === "NON_NULL") return sample(t.ofType, field, depth);
+  if (t.kind === "LIST") return [sample(t.ofType, field, depth)];
+  if (t.kind === "ENUM") return gql.types[t.name]?.enumValues?.[0] ?? null;
+  if (t.kind === "INPUT_OBJECT") return sampleInput(t.name, depth + 1);
+  const f = (field || "").toLowerCase();
+  switch (t.name) {
+    case "Int": case "Long": case "Short": case "BigInteger": return 1;
+    case "Float": case "BigDecimal": return 1.0;
+    case "Boolean": return false;
+    case "JSON": case "Object": case "Map": return {};
+    case "Date": case "LocalDate": return "2026-01-01";
+    case "DateTime": case "LocalDateTime": case "Instant": return "2026-01-01T09:00:00";
+  }
+  if (/mrn|hn$/.test(f)) return "SW{{run}}";
+  if (/encounterid/.test(f)) return "ENC-SW{{run}}";
+  if (/transactionid|txid/.test(f)) return "TX-SW{{run}}";
+  if (/datetime|date|time/.test(f)) return "2026-01-01T09:00:00";
+  if (/name/.test(f)) return "Swarm{{run}}";
+  if (/code|type|status/.test(f)) return "TEST";
+  return "swarm-test";
+}
+const KEEP_OPTIONAL = /^(mrn|encounterId|transactionId)$/;
+function sampleInput(name, depth) {
+  const t = gql.types[name];
+  if (!t?.inputFields || depth > 3) return {};
+  const out = {};
+  for (const f of t.inputFields) {
+    const required = f.type.kind === "NON_NULL" && f.defaultValue == null;
+    if (required || KEEP_OPTIONAL.test(f.name)) out[f.name] = sample(f.type, f.name, depth);
+  }
+  return out;
+}
+function selection(t, depth = 0) {
+  const b = baseType(t);
+  const obj = gql.types[b.name];
+  if (!obj || obj.kind !== "OBJECT") return "";
+  const scal = (obj.fields || []).filter(f => { const k = baseType(f.type).kind; return k === "SCALAR" || k === "ENUM"; }).map(f => f.name);
+  scal.sort((x, y) => (y === "id") - (x === "id") || (y === "mrn") - (x === "mrn"));
+  const pick = scal.slice(0, 8);
+  return pick.length ? ` { ${pick.join(" ")} }` : " { __typename }";
+}
+function pickMutation(m) {
+  closePicker();
+  $("dTpl").value = m.name;
+  const known = TEMPLATES_BY_NAME[m.name];
+  if (known) { useTemplate(known); $("dSchemaInfo").textContent = `${m.name}: ใช้ชุดค่าที่ทดสอบแล้ว`; return; }
+  const used = m.args.filter(a => a.type.kind === "NON_NULL" || a.name === "input");
+  const vars = Object.fromEntries(used.map(a => [a.name, sample(a.type, a.name, 0)]));
+  const decl = used.length ? `(${used.map(a => `$${a.name}: ${typeStr(a.type)}`).join(", ")})` : "";
+  const call = used.length ? `(${used.map(a => `${a.name}: $${a.name}`).join(", ")})` : "";
+  $("dQuery").value = `mutation${decl} {\n  ${m.name}${call}${selection(m.type)}\n}`;
+  $("dVars").value = JSON.stringify(vars, null, 2);
+  const hasRun = $("dVars").value.includes("{{run}}");
+  const warn = groupOf(m) === 2 ? " ระวัง: mutation นี้แก้หรือลบข้อมูลจริง" : "";
+  $("dSchemaInfo").textContent = `${m.name}: สร้างจาก schema ใส่เฉพาะ field ที่บังคับ ตรวจค่าก่อนส่ง${hasRun ? "" : " (ไม่มี field ที่ใส่ {{run}} ได้ ทุกรอบจะส่งข้อมูลเดิม)"}${warn}`;
+}
+
+$("dupBtn").onclick = async () => {
+  let payload;
+  try { payload = currentTest(); } catch (e) { $("dupMsg").className = "msg err"; $("dupMsg").textContent = e.message; return; }
+  $("dupBtn").disabled = true; $("dupMsg").className = "msg"; $("dupMsg").textContent = "ส่งภารกิจไปยังทุกยูนิต…"; $("dupResult").innerHTML = "";
+  flow(true);
+  try {
+    const j = await postJson("/api/dup", payload);
+    const n = j.uniqueIds.length, failed = j.results.filter(r => r.id == null).length;
+    const want = j.keyMode === "unique" ? j.copies : 1;
+    const ok = n === want && failed === 0;
+    missions[ok ? "pass" : "fail"]++;
+    try { localStorage.setItem("replicalab.missions", JSON.stringify(missions)); } catch { /* private window */ }
+    showMissions();
+    const perSlot = {};
+    j.results.forEach(r => { perSlot[r.slot] = (perSlot[r.slot] || 0) + 1; });
+    Object.entries(perSlot).forEach(([s, c]) => floatOver(Number(s), "+" + c));
+    $("dupMsg").innerHTML = `<span class="verdict ${ok ? "ok" : "bad"}">${ok ? "ภารกิจสำเร็จ" : "ภารกิจล้มเหลว"}</span>${j.copies} ชุด กระจายไป ${j.replicas} ยูนิต ได้ id ไม่ซ้ำกัน ${n} ตัว จากที่คาดไว้ ${want}` +
+      (failed ? `, ไม่ได้ id ${failed} ชุด` : "") + ` <span class="small">รอบ ${esc(j.runTag)}, ${j.elapsedMs} ms, ${esc(j.image)}</span>`;
+    $("dupResult").innerHTML = `<table><thead><tr><th>ชุด</th><th>ยูนิต</th><th>HTTP</th><th class="num">ms</th><th>id ที่ได้</th><th>error</th></tr></thead><tbody>` +
+      j.results.map(r => `<tr><td class="num">${r.copy}</td><td>slot ${r.slot} <span class="mono small">${esc(r.taskId)}</span></td><td class="num">${r.status || "–"}</td>
+        <td class="num">${r.ms}</td><td class="mono">${esc(r.id ?? "–")}</td><td class="small">${esc(r.errors || "")}</td></tr>`).join("") + `</tbody></table>`;
+  } catch (e) {
+    $("dupMsg").className = "msg err"; $("dupMsg").textContent = "ส่งไม่ได้: " + e.message;
+  } finally { $("dupBtn").disabled = false; flow(false); }
+};
+
+$("loadBtn").onclick = async () => {
+  $("loadBtn").disabled = true; $("loadMsg").className = "msg"; $("loadMsg").textContent = "กำลังยิง…"; $("loadResult").innerHTML = "";
+  flow(true);
+  try {
+    const j = await postJson("/api/load", { count: Number($("lCount").value), concurrency: Number($("lConc").value) });
+    $("loadMsg").textContent = `ส่ง ${j.sent} สำเร็จ ${j.ok} ล้มเหลว ${j.failed}, ${j.rps} req/s, p50 ${j.p50} ms, p95 ${j.p95} ms`;
+    j.perReplica.forEach(x => x.handled != null && floatOver(x.slot, "+" + x.handled));
+    const total = j.perReplica.reduce((a, x) => a + (x.handled || 0), 0) || 1;
+    $("loadResult").innerHTML = `<table style="margin-top:6px"><thead><tr><th>Slot</th><th>Task</th><th class="num">รับไป</th><th></th></tr></thead><tbody>` +
+      j.perReplica.map(x => `<tr><td class="num">${x.slot}</td><td class="mono">${esc(x.taskId)}</td><td class="num">${x.handled ?? "–"}</td>
+        <td style="width:45%"><div class="bar"><i style="width:${Math.round(100 * (x.handled || 0) / total)}%"></i></div></td></tr>`).join("") + `</tbody></table>`;
+  } catch (e) {
+    $("loadMsg").className = "msg err"; $("loadMsg").textContent = "ยิงไม่ได้: " + e.message;
+  } finally { $("loadBtn").disabled = false; flow(false); refresh(); }
+};
+
+// ---------- the app running now: mode, panels, saved tests ----------
+let APP = null, mode = "graphql";
+function setMode(m) {
+  mode = m === "http" ? "http" : "graphql";
+  $("mGql").setAttribute("aria-selected", String(mode === "graphql")); $("mHttp").setAttribute("aria-selected", String(mode === "http"));
+  $("gqlBox").hidden = mode !== "graphql"; $("httpBox").hidden = mode !== "http";
+}
+$("mGql").onclick = () => setMode("graphql");
+$("mHttp").onclick = () => setMode("http");
+function onAppChanged(app) {
+  APP = app;
+  $("appName").textContent = app.name;
+  $("buildBox").hidden = !app.buildLocal;
+  setMode(app.test);
+  if (app.kind !== "spring" && !$("hPath").value) $("hPath").value = app.health || "/";
+  $("loadHint").innerHTML = app.kind === "spring"
+    ? "ยิง <code>GET /actuator/info</code> ผ่าน VIP ของ service โดยเปิด connection ใหม่ทุกครั้ง แล้วนับจาก metrics ว่าแต่ละยูนิตรับไปกี่ request"
+    : `ยิง <code>GET ${esc(app.health)}</code> ผ่าน VIP ของ service โดยเปิด connection ใหม่ทุกครั้ง (แอปนี้ไม่มี metrics ต่อ replica จึงนับรวมได้อย่างเดียว)`;
+  gql = null;                          // another app = another schema
+  loadTests();
+}
+
+// the test on screen <-> a saved test (apps\<app>.tests.json through the helper)
+function currentTest() {
+  const common = { copies: Number($("dCopies").value), keyMode: $("dKey").value, delayMs: Number($("dDelay").value) };
+  if (mode === "http") {
+    let headers = {};
+    if ($("hHeaders").value.trim()) { try { headers = JSON.parse($("hHeaders").value); } catch { throw new Error("Headers ไม่ใช่ JSON"); } }
+    const path = $("hPath").value.trim();
+    if (!path.startsWith("/")) throw new Error("Path ต้องขึ้นต้นด้วย /");
+    return { mode, method: $("hMethod").value, path, headers, body: $("hBody").value, idPath: $("hIdPath").value.trim(), ...common };
+  }
+  let variables;
+  try { variables = JSON.parse($("dVars").value || "{}"); } catch { throw new Error("Variables ไม่ใช่ JSON"); }
+  return { mode, query: $("dQuery").value, variables, picked: $("dTpl").value, ...common };
+}
+function applyTest(t) {
+  setMode(t.mode);
+  if (t.mode === "http") {
+    $("hMethod").value = t.method || "POST"; $("hPath").value = t.path || "/"; $("hIdPath").value = t.idPath || "";
+    $("hHeaders").value = JSON.stringify(t.headers || {}, null, 2); $("hBody").value = t.body || "";
+  } else {
+    $("dQuery").value = t.query || ""; $("dVars").value = JSON.stringify(t.variables || {}, null, 2); $("dTpl").value = t.picked || "";
+  }
+  if (t.copies) $("dCopies").value = t.copies;
+  if (t.keyMode) $("dKey").value = t.keyMode;
+  $("dDelay").value = t.delayMs || 0;
+  $("tName").value = t.name || "";
+}
+let savedTests = [];
+function showTests(keep) {
+  $("tSaved").innerHTML = savedTests.length
+    ? `<option value="">เลือกชุดทดสอบ…</option>` + savedTests.map(t => `<option${t.name === keep ? " selected" : ""}>${esc(t.name)}</option>`).join("")
+    : `<option value="">ยังไม่มี บันทึกชุดแรกได้เลย</option>`;
+  $("tDel").disabled = !$("tSaved").value;
+}
+async function loadTests() {
+  if (!APP) return;
+  try { savedTests = await builder("GET", `/tests?app=${encodeURIComponent(APP.name)}`); showTests(); $("tMsg").textContent = ""; }
+  catch { savedTests = []; showTests(); $("tMsg").textContent = "เก็บชุดทดสอบต้องใช้ตัวช่วยบนเครื่อง (เปิดจาก start.cmd)"; }
+}
+$("tSaved").onchange = () => {
+  const t = savedTests.find(x => x.name === $("tSaved").value);
+  $("tDel").disabled = !t;
+  if (t) { applyTest(t); $("tMsg").className = "msg"; $("tMsg").textContent = `โหลด "${t.name}" แล้ว`; }
+};
+$("tSave").onclick = async () => {
+  const name = $("tName").value.trim() || $("tSaved").value;
+  if (!name) { $("tMsg").className = "msg err"; $("tMsg").textContent = "ตั้งชื่อชุดทดสอบก่อน"; $("tName").focus(); return; }
+  try {
+    const t = { ...currentTest(), name };
+    savedTests = await builder("POST", "/tests/save", { app: APP.name, test: t });
+    showTests(name);
+    $("tMsg").className = "msg"; $("tMsg").textContent = `บันทึก "${name}" ไว้ใน apps\\${APP.name}.tests.json แล้ว`;
+  } catch (e) { $("tMsg").className = "msg err"; $("tMsg").textContent = "บันทึกไม่ได้: " + e.message; }
+};
+$("tDel").onclick = async () => {
+  const name = $("tSaved").value;
+  if (!name || !confirm(`ลบชุดทดสอบ "${name}"?`)) return;
+  try { savedTests = await builder("POST", "/tests/delete", { app: APP.name, name }); showTests(); $("tMsg").textContent = `ลบ "${name}" แล้ว`; }
+  catch (e) { $("tMsg").className = "msg err"; $("tMsg").textContent = "ลบไม่ได้: " + e.message; }
+};
+
+// ---------- app drawer: switch app, add an app from a local image, edit one ----------
+let appData = null, switchTimer = null;
+// ---------- about + update ----------
+let updInfo = null;
+function openAbout() { $("aboutCard").hidden = false; $("aboutScrim").hidden = false; loadAbout(); if (updInfo) showUpdate(updInfo); }
+function closeAbout() { $("aboutCard").hidden = true; $("aboutScrim").hidden = true; }
+document.querySelector(".brand").addEventListener("click", e => { if (!e.target.closest("#updChip")) openAbout(); });
+$("updChip").onclick = openAbout;
+$("aboutClose").onclick = closeAbout;
+$("aboutScrim").onclick = closeAbout;
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("aboutCard").hidden) closeAbout(); });
+async function loadAbout() {
+  try {
+    const a = await builder("GET", "/about");
+    $("aVersion").textContent = a.version; $("aDocker").textContent = a.docker || "อ่านไม่ได้"; $("aNode").textContent = a.node;
+    $("aFolder").textContent = a.folder;
+    $("aRepo").innerHTML = a.repo ? `<a href="https://github.com/${esc(a.repo)}" target="_blank">github.com/${esc(a.repo)}</a>` : "–";
+    $("aChangelog").textContent = a.changelog || "–";
+    $("uTokenInfo").textContent = (a.tokenSet ? "มี token แล้ว " : "") + "เก็บไว้ที่ config\\github-token.txt ของเครื่องนี้เท่านั้น ไม่ขึ้น git";
+  } catch (e) { $("aChangelog").textContent = "อ่านข้อมูลไม่ได้: " + e.message + " (ต้องเปิดผ่าน Replica Lab.exe ให้ตัวช่วยทำงาน)"; }
+}
+function showUpdate(u) {
+  updInfo = u;
+  $("updChip").hidden = !u.newer; if (u.newer) $("updChip").textContent = `มีเวอร์ชันใหม่ ${u.latest}`;
+  $("uMsg").className = "msg" + (u.error ? " err" : "");
+  $("uMsg").textContent = u.error ? u.error : u.newer ? `มีเวอร์ชันใหม่ ${u.latest} (ตอนนี้ ${u.current})` : `เป็นเวอร์ชันล่าสุดแล้ว (${u.current})`;
+  $("uNotes").hidden = !u.notes; $("uNotes").textContent = u.notes || "";
+  $("uApply").hidden = !u.newer; $("uApply").textContent = `อัปเดตเป็น ${u.latest}`; $("uApply").dataset.tag = u.tag || "";
+}
+async function checkUpdate(force) {
+  $("uMsg").className = "msg"; if (force) $("uMsg").textContent = "กำลังเช็ค…";
+  try { showUpdate(await builder("GET", "/update/check" + (force ? "?force=1" : ""))); }
+  catch (e) { if (force) { $("uMsg").className = "msg err"; $("uMsg").textContent = "เช็คไม่ได้: " + e.message; } }
+}
+$("uCheck").onclick = () => checkUpdate(true);
+$("uTokenSave").onclick = async () => {
+  try { const r = await builder("POST", "/update/token", { token: $("uToken").value }); $("uToken").value = ""; $("uTokenInfo").textContent = r.tokenSet ? "บันทึก token แล้ว" : "ลบ token แล้ว"; checkUpdate(true); }
+  catch (e) { $("uTokenInfo").textContent = "บันทึกไม่ได้: " + e.message; }
+};
+$("uApply").onclick = async () => {
+  const tag = $("uApply").dataset.tag, target = (updInfo?.latest || "").replace(/^v/, "");
+  if (!tag || !confirm(`อัปเดต Replica Lab เป็น ${target}?\n\nระบบจะดาวน์โหลดเวอร์ชันใหม่ เขียนทับไฟล์โปรแกรม (ไม่แตะ config, ความลับ และโปรไฟล์แอปที่มีอยู่) แล้วเริ่มหน้าใหม่ แอปที่ลงสนามยังรันต่อ`)) return;
+  closeAbout();
+  showSwitching(`กำลังอัปเดตเป็น ${target}`);
+  const t0 = Date.now();
+  const fail = msg => { clearInterval(switchTimer); $("swOverlay").className = "switching err"; $("swStep").textContent = msg; $("swActions").hidden = false; };
+  try { await builder("POST", "/update/apply", { tag }); } catch (e) { return fail("อัปเดตไม่ได้: " + e.message); }
+  clearInterval(switchTimer);
+  switchTimer = setInterval(async () => {
+    $("swTime").textContent = `ผ่านไป ${Math.round((Date.now() - t0) / 1000)} วินาที หน้านี้จะโหลดใหม่เองเมื่อเสร็จ`;
+    try {
+      const j = await builder("GET", "/update/status");
+      $("swLog").textContent = (j.lines || []).slice(-10).join("\n");
+      if (j.state === "error") return fail("อัปเดตไม่สำเร็จ ดูข้อความด้านล่าง");
+      $("swStep").textContent = j.state === "done" ? "ติดตั้งแล้ว กำลังเริ่มใหม่…" : "กำลังดาวน์โหลดและติดตั้ง…";
+    } catch {
+      $("swStep").textContent = "กำลังเริ่มตัวช่วยและหน้าใหม่ด้วยเวอร์ชันใหม่…";
+      try { const r = await fetch("/api/status", { cache: "no-store" }); const s = await r.json(); if (r.ok && s.version === target) { clearInterval(switchTimer); $("swOverlay").className = "switching done"; $("swStep").textContent = "อัปเดตแล้ว กำลังโหลดหน้าใหม่"; setTimeout(() => location.reload(), 600); } } catch { /* page restarting */ }
+    }
+    if (Date.now() - t0 > 600000) fail("ใช้เวลานานเกินไป ลองปิดแล้วเปิด Replica Lab ใหม่");
+  }, 2000);
+};
+setTimeout(() => checkUpdate(false), 4000);      // quietly, once per page load (cached 10 min by the helper)
+
+// ---------- build an image from a project folder ----------
+let fTimer = null;
+async function loadRecentFolders() {
+  try {
+    const list = await builder("GET", "/folder/recent");
+    $("fRecent").innerHTML = list.map(d => `<option value="${esc(d)}"></option>`).join("");
+    if (!$("fDir").value && list[0]) $("fDir").value = list[0];
+  } catch { /* helper not running */ }
+}
+$("fInspect").onclick = async () => {
+  $("fMsg").className = "msg"; $("fMsg").textContent = "กำลังดูโฟลเดอร์…";
+  try {
+    const d = await builder("POST", "/folder/inspect", { dir: $("fDir").value });
+    $("fDir").value = d.dir;
+    $("fDockerfile").innerHTML = d.dockerfiles.map(f => `<option>${esc(f)}</option>`).join("");
+    $("fTag").value = d.tag;
+    $("fForm").hidden = false; $("fActs").hidden = false; $("fRestart").hidden = true;
+    $("fInfo").textContent = [d.branch ? `branch ${d.branch}` : "", d.changed ? `แก้ค้าง ${d.changed} ไฟล์ (รวมใน image ด้วย)` : "",
+                              d.dockerignore ? "" : "ไม่มี .dockerignore (ถ้าโฟลเดอร์ใหญ่ build จะช้า)"].filter(Boolean).join(" · ");
+    $("fMsg").textContent = "พร้อม build";
+  } catch (e) { $("fForm").hidden = true; $("fActs").hidden = true; $("fMsg").className = "msg err"; $("fMsg").textContent = e.message; }
+};
+$("fDir").addEventListener("keydown", e => { if (e.key === "Enter") $("fInspect").click(); });
+function showImageBuild(j) {
+  if (!j?.state) return;
+  const running = j.state === "running";
+  $("fBuild").disabled = running; $("fCancel").hidden = !running; $("fLog").hidden = false;
+  $("fLog").innerHTML = j.lines.map(l => /ERROR|error:|failed/i.test(l) ? `<span class="e">${esc(l)}</span>` : esc(l)).join("\n");
+  $("fLog").scrollTop = $("fLog").scrollHeight;
+  const text = { running: `กำลัง build ${j.tag}…`, done: `build ${j.tag} เสร็จ`, error: `build ${j.tag} ไม่สำเร็จ ดู log ด้านล่าง`, cancelled: "ยกเลิกแล้ว" }[j.state];
+  $("fMsg").className = "msg" + (j.state === "error" ? " err" : ""); $("fMsg").textContent = text;
+  if (!running && fTimer) { clearInterval(fTimer); fTimer = null; if (j.state === "done") afterImageBuild(j.tag); }
+}
+async function afterImageBuild(tag) {
+  const running = lastStatus?.image === tag;
+  const owner = (appData?.apps || []).find(a => a.image === tag);
+  if (running) {
+    $("fRestart").hidden = false; $("fRestart").dataset.tag = tag;
+    $("fMsg").textContent = `build ${tag} เสร็จ แอปที่ลงสนามใช้ image ชื่อนี้อยู่ กด "รีสตาร์ท replica ด้วย image ใหม่" เพื่อให้ใช้ตัวที่เพิ่ง build`;
+    return;
+  }
+  if (owner) { $("fMsg").textContent = `build ${tag} เสร็จ แอป ${owner.name} ใช้ image นี้อยู่แล้ว กด "ใช้แอปนี้" ที่แอป ${owner.name} ได้เลย`; return; }
+  await loadLocalImages();
+  $("nImage").value = tag;
+  $("nImage").dispatchEvent(new Event("change"));       // fills the add-app form from the new image
+  $("fMsg").textContent = `build ${tag} เสร็จ กรอกฟอร์มเพิ่มแอปด้านล่างให้แล้ว ตรวจแล้วกด "บันทึกแล้วใช้เลย"`;
+  $("nName").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+$("fBuild").onclick = async () => {
+  try {
+    showImageBuild(await builder("POST", "/folder/build", { dir: $("fDir").value, dockerfile: $("fDockerfile").value, tag: $("fTag").value }));
+    clearInterval(fTimer);
+    fTimer = setInterval(async () => { try { showImageBuild(await builder("GET", "/folder/build")); } catch { /* helper busy */ } }, 1500);
+  } catch (e) { $("fMsg").className = "msg err"; $("fMsg").textContent = "build ไม่ได้: " + e.message; }
+};
+$("fCancel").onclick = async () => { try { showImageBuild(await builder("POST", "/folder/cancel")); } catch (e) { $("fMsg").textContent = e.message; } };
+$("fRestart").onclick = async () => {
+  try {
+    await builder("POST", "/app/force-image", { tag: $("fRestart").dataset.tag });
+    $("fRestart").hidden = true;
+    $("fMsg").className = "msg"; $("fMsg").textContent = "สั่งรีสตาร์ทแล้ว Swarm ทยอยเปลี่ยนทีละยูนิต (ดูที่การ์ดยูนิต)";
+  } catch (e) { $("fMsg").className = "msg err"; $("fMsg").textContent = "รีสตาร์ทไม่ได้: " + e.message; }
+};
+
+function openApps() {
+  $("appCard").hidden = false; $("appScrim").hidden = false; loadApps(); loadLocalImages(); loadSwarm(); loadRecentFolders();
+  builder("GET", "/folder/build").then(j => { if (j?.state) { $("fForm").hidden = false; $("fActs").hidden = false; showImageBuild(j); if (j.state === "running" && !fTimer) fTimer = setInterval(async () => { try { showImageBuild(await builder("GET", "/folder/build")); } catch {} }, 1500); } }).catch(() => {});
+  if (!$("nName").value) fillForm(newAppDefaults(""), null);    // empty form: show the defaults
+}
+async function loadSwarm() {
+  try {
+    const list = await builder("GET", "/swarm/services");
+    $("swarmList").innerHTML = list.length ? list.map(s => `<div class="app-item">
+      <div><b>${esc(s.name)}</b> <span class="small">replica ${esc(s.replicas)}${s.ports ? " · " + esc(s.ports) : ""}</span></div>
+      <div class="acts"><button class="mini" data-import="${esc(s.name)}">นำเข้า</button></div>
+      <div class="small mono">${esc(s.image)}</div></div>`).join("") : `<div class="small">ไม่มี service อื่นใน swarm</div>`;
+  } catch (e) { $("swarmList").innerHTML = `<div class="msg err">อ่าน swarm ไม่ได้: ${esc(e.message)}</div>`; }
+}
+$("swarmList").addEventListener("click", async e => {
+  const b = e.target.closest("[data-import]");
+  if (!b) return;
+  $("appMsg").className = "msg"; $("appMsg").textContent = `กำลังอ่าน service ${b.dataset.import}…`;
+  try {
+    const d = await builder("POST", "/swarm/import", { name: b.dataset.import });
+    fillForm(d.profile, d.env);
+    $("formTitle").textContent = `นำเข้าจาก service ${b.dataset.import}`; editingName = ""; markBad([]);
+    $("nNotes").textContent = d.notes.join(" · ") + (d.exists ? ` (มีแอปชื่อ ${d.profile.name} อยู่แล้ว บันทึกจะเขียนทับ)` : "");
+    $("appMsg").textContent = "ตรวจค่าแล้วกดบันทึก";
+    $("nName").scrollIntoView({ behavior: "smooth", block: "center" });
+  } catch (e) { $("appMsg").className = "msg err"; $("appMsg").textContent = "นำเข้าไม่ได้: " + e.message; }
+});
+function closeApps() { $("appCard").hidden = true; $("appScrim").hidden = true; }
+$("appBtn").onclick = openApps;
+$("appClose").onclick = closeApps;
+$("appScrim").onclick = closeApps;
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("appCard").hidden) closeApps(); });
+async function loadApps() {
+  try {
+    appData = await builder("GET", "/apps");
+    const on = appData.running || appData.current;
+    $("appList").innerHTML = appData.apps.map(a => `<div class="app-item${a.name === on ? " on" : ""}">
+      <div><b>${esc(a.title || a.name)}</b> <span class="small">${esc(a.name)} · ${esc(a.kind)} · port ${a.hostPort} · RAM ${a.memoryMb ? a.memoryMb + " MB" + (a.memoryAuto ? " (วัดอัตโนมัติ)" : "") : "วัดตอนขึ้นครั้งแรก"}</span></div>
+      <div class="acts">${a.name === on ? `<span class="pill ok">ลงสนามอยู่</span>` : `<button class="mini primary" data-use="${esc(a.name)}">ใช้แอปนี้</button>`}
+        <button class="mini" data-edit="${esc(a.name)}">แก้</button>
+        <button class="mini" data-tune="${esc(a.name)}" title="รัน container ทดลอง วัด RAM แล้วตั้ง limit ใหม่ (ถ้าแอปนี้ลงสนามอยู่ replica จะเริ่มใหม่ด้วยค่าใหม่)">จูน RAM ใหม่</button>
+        ${a.name === on ? `<button class="mini danger" disabled title="ลงสนามอยู่ สลับไปแอปอื่นก่อนค่อยลบ">ลบ</button>` : `<button class="mini danger" data-del="${esc(a.name)}">ลบ</button>`}</div>
+      <div class="small mono">${esc(a.image)}</div></div>`).join("") || `<div class="small">ยังไม่มีแอป</div>`;
+  } catch (e) { $("appList").innerHTML = `<div class="msg err">อ่านรายการแอปไม่ได้: ${esc(e.message)} (ต้องเปิดผ่าน start.cmd ให้ตัวช่วยทำงาน)</div>`; }
+}
+async function loadLocalImages() {
+  try {
+    const list = await builder("GET", "/images");
+    $("nImage").innerHTML = `<option value="">เลือก image…</option>` + list.map(i => `<option value="${esc(i.image)}">${esc(i.image)}  (${esc(i.created)}, ${esc(i.size)})</option>`).join("");
+  } catch (e) { $("nImage").innerHTML = `<option value="">อ่าน image ไม่ได้</option>`; }
+}
+function fillForm(p, env) {
+  $("nName").value = p.name || ""; $("nTitle").value = p.title || ""; $("nKind").value = p.kind || "http";
+  $("nPort").value = p.port || 8080; $("nHostPort").value = p.hostPort || 8080; $("nHealth").value = p.health || "/";
+  $("nStart").value = p.startPeriod || 60; $("nTest").value = p.test || "http";
+  $("nMem").value = p.memoryMb || ""; $("nMemAuto").checked = !p.memoryMb; $("nMem").disabled = !p.memoryMb;
+  $("nMem").placeholder = p.memoryMb ? "" : "วัดตอนขึ้นครั้งแรก";
+  $("nImageVal").value = p.image || ""; $("nBuild").value = p.buildLocal ? "1" : "";
+  if (env != null) $("nEnv").value = env;
+}
+// defaults for a new app: name like the image, port 8080, RAM auto (measured on first start)
+const nameFromImage = img => {
+  const repo = String(img || "").replace(/:[^/:]+$/, "").split("/").pop() || "";
+  return repo.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 31);
+};
+function newAppDefaults(image) {
+  const name = nameFromImage(image);
+  return { name, title: name, image, kind: "tomcat", port: 8080, hostPort: Number($("nHostPort").value) || 8080,
+           health: "/", startPeriod: 120, memoryMb: 0, test: "http" };
+}
+// picking an image fills the form straight away (then refines it from the image itself); everything stays editable
+$("nImage").onchange = () => {
+  const image = $("nImage").value;
+  $("nImageVal").value = image;
+  if (!image) return;
+  $("formTitle").textContent = "เพิ่มแอปจาก image ในเครื่อง"; editingName = ""; markBad([]);
+  fillForm(newAppDefaults(image), "");
+  $("nNotes").textContent = "";
+  detectImage(image);
+};
+$("nMemAuto").onchange = () => { $("nMem").disabled = $("nMemAuto").checked; if (!$("nMemAuto").checked && !$("nMem").value) $("nMem").value = 1024; };
+async function detectImage(image) {
+  $("appMsg").className = "msg"; $("appMsg").textContent = "กำลังดู image เพื่อเดาค่าให้แม่นขึ้น…";
+  try {
+    const d = await builder("POST", "/detect", { image });
+    if ($("nImage").value !== image) return;          // picked another image meanwhile
+    fillForm({ ...d.profile, port: d.profile.port || 8080, memoryMb: 0 }, null);
+    $("nNotes").textContent = d.notes.join(" · ") + (d.exists ? ` (มีแอปชื่อ ${d.profile.name} อยู่แล้ว บันทึกจะเขียนทับ)` : "");
+    $("appMsg").textContent = "ใส่ค่าให้แล้ว แก้ได้ แล้วกดบันทึก";
+  } catch (e) { $("appMsg").className = "msg"; $("appMsg").textContent = "ใช้ค่าเริ่มต้น (เดาจาก image ไม่ได้: " + e.message + ") แก้ได้แล้วกดบันทึก"; }
+}
+$("nDetect").onclick = () => {
+  const image = $("nImage").value;
+  if (!image) { $("appMsg").className = "msg err"; $("appMsg").textContent = "เลือก image ก่อน"; return; }
+  detectImage(image);
+};
+$("appList").addEventListener("click", async e => {
+  const use = e.target.closest("[data-use]"), edit = e.target.closest("[data-edit]"), tune = e.target.closest("[data-tune]");
+  if (use) return switchTo(use.dataset.use);
+  if (tune) return switchTo(tune.dataset.tune, true);
+  const del = e.target.closest("[data-del]");
+  if (del) {
+    const p = appData.apps.find(a => a.name === del.dataset.del);
+    const tests = await builder("GET", `/tests?app=${encodeURIComponent(p.name)}`).catch(() => []);
+    const ok = confirm(`ลบแอป "${p.title || p.name}" ?\n\nจะลบ:\n- โปรไฟล์ apps\\${p.name}.json และ environment apps\\${p.name}.env\n- ชุดทดสอบที่บันทึกไว้ ${tests.length} ชุด\n- ค่าที่จำไว้ (image, replica, port)\n\nimage ${p.image} ยังอยู่ในเครื่อง ลบแล้วกู้คืนไม่ได้ (เพิ่มแอปใหม่จาก image ได้)`);
+    if (!ok) return;
+    try {
+      const r = await builder("POST", "/apps/delete", { name: p.name });
+      $("appMsg").className = "msg"; $("appMsg").textContent = `ลบแอป ${r.name} แล้ว (${r.removed.length} ไฟล์)`;
+      await loadApps();
+    } catch (err) { $("appMsg").className = "msg err"; $("appMsg").textContent = "ลบไม่ได้: " + err.message; }
+  }
+  if (edit) {
+    const p = appData.apps.find(a => a.name === edit.dataset.edit);
+    const { env } = await builder("GET", `/apps/env?name=${encodeURIComponent(p.name)}`).catch(() => ({ env: "" }));
+    fillForm(p, env);
+    $("formTitle").textContent = `แก้แอป ${p.name}`; $("nNotes").textContent = p.note || ""; editingName = p.name; markBad([]);
+    $("nName").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+});
+function formProfile() {
+  return { name: $("nName").value.trim(), title: $("nTitle").value.trim(), image: $("nImageVal").value || $("nImage").value, kind: $("nKind").value,
+           port: Number($("nPort").value), hostPort: Number($("nHostPort").value), health: $("nHealth").value.trim(), startPeriod: Number($("nStart").value),
+           memoryMb: $("nMemAuto").checked ? 0 : Number($("nMem").value), memoryAuto: false, test: $("nTest").value, buildLocal: $("nBuild").value === "1" };
+}
+// fields the helper says are taken (duplicate name / host port): red until edited
+const FIELD_INPUT = { name: "nName", hostPort: "nHostPort" };
+function markBad(fields) {
+  for (const id of Object.values(FIELD_INPUT)) $(id).classList.remove("bad");
+  for (const f of fields || []) if (FIELD_INPUT[f]) $(FIELD_INPUT[f]).classList.add("bad");
+  if (fields?.length && FIELD_INPUT[fields[0]]) $(FIELD_INPUT[fields[0]]).focus();
+}
+for (const id of Object.values(FIELD_INPUT)) $(id).addEventListener("input", () => $(id).classList.remove("bad"));
+let editingName = "";      // set while editing an existing app: its own name/port are not duplicates
+async function saveForm(andUse) {
+  try {
+    const r = await fetch(BUILDER + "/apps/save", { method: "POST", headers: { "X-Replica-Lab": "1", "Content-Type": "application/json" },
+                                                    body: JSON.stringify({ profile: formProfile(), env: $("nEnv").value, original: editingName }) });
+    const j = await r.json();
+    if (!r.ok) { markBad(j.fields); throw new Error(j.error || r.status); }
+    markBad([]);
+    const { profile } = j;
+    editingName = profile.name;
+    $("appMsg").className = "msg"; $("appMsg").textContent = `บันทึกแอป ${profile.name} แล้ว (apps\\${profile.name}.json)`;
+    await loadApps();
+    if (andUse) switchTo(profile.name);
+  } catch (e) { $("appMsg").className = "msg err"; $("appMsg").textContent = "บันทึกไม่ได้: " + e.message; }
+}
+$("nSave").onclick = () => saveForm(false);
+$("nSaveUse").onclick = () => saveForm(true);
+// what run-local.ps1 is doing, in plain words, from its latest output
+function switchStep(lines, name) {
+  const l = [...lines].reverse().join("\n");
+  const last = l.split("\n")[0] || "";
+  if (/stack deploy|retry/i.test(last)) return `กำลังส่ง ${name} ลงสนาม (deploy)`;
+  if (/watching RAM|peak/i.test(last)) return "กำลังวัด RAM ของแอป";
+  if (/RAM auto|trial/i.test(last)) return "กำลังรัน container ทดลองเพื่อวัด RAM";
+  if (/page image/i.test(last)) return "กำลังเตรียมหน้า Replica Lab";
+  if (/^== image/i.test(last)) return "กำลังเช็ค image";
+  if (/recreating/i.test(last)) return "กำลังสร้าง service ใหม่ (port หรือแอปเปลี่ยน)";
+  if (/stopping/i.test(last)) return "กำลังหยุดแอปเดิม (จำค่าไว้ให้)";
+  if (/^== app/i.test(last)) return `กำลังเตรียม ${name}`;
+  return "กำลังเช็ค Docker";
+}
+function showSwitching(title) {
+  $("swOverlay").hidden = false; $("swOverlay").className = "switching";
+  $("swTitle").textContent = title; $("swStep").textContent = "กำลังเริ่ม…"; $("swLog").textContent = ""; $("swActions").hidden = true;
+}
+$("swClose").onclick = () => { $("swOverlay").hidden = true; };
+async function switchTo(name, tune) {
+  const isRunning = name === (appData?.running || "");
+  const q = tune ? `วัด RAM ของ ${name} ใหม่? ระบบจะรัน container ทดลอง 1 ตัวประมาณ 1-3 นาที${isRunning ? " แล้ว replica จะเริ่มใหม่ด้วยค่าใหม่" : " แล้วสลับไปใช้แอปนี้"}`
+               : `สลับไปใช้ ${name}? แอปที่ลงสนามอยู่จะหยุด (จำค่าไว้ให้)`;
+  if ((tune || !isRunning) && !confirm(q)) return;
+  closeApps();
+  showSwitching(tune ? `กำลังวัด RAM ของ ${name}` : `กำลังสลับไป ${name}`);
+  const t0 = Date.now();
+  const tick = () => { $("swTime").textContent = `ผ่านไป ${Math.round((Date.now() - t0) / 1000)} วินาที หน้านี้จะโหลดใหม่เองเมื่อเสร็จ`; };
+  const fail = msg => { clearInterval(switchTimer); $("swOverlay").className = "switching err"; $("swStep").textContent = msg; $("swActions").hidden = false; };
+  try {
+    await builder("POST", "/apps/switch", { name, tune: !!tune });
+  } catch (e) { return fail("สลับไม่ได้: " + e.message); }
+  clearInterval(switchTimer);
+  switchTimer = setInterval(async () => {
+    tick();
+    try {
+      const st = await builder("GET", "/launch/status");
+      const lines = st.launch?.lines || [];
+      $("swLog").textContent = lines.slice(-10).join("\n"); $("swLog").scrollTop = 1e6;
+      if (st.launch?.state === "error") return fail("ไม่สำเร็จ ดูข้อความด้านล่าง");
+      if (st.launch?.state !== "done") { $("swStep").textContent = switchStep(lines, name); return; }
+      // the page service restarted with the new app: reload only once it answers with that app
+      clearInterval(switchTimer);
+      $("swStep").textContent = "รอหน้าใหม่พร้อม…";
+      const waitUp = async () => {
+        tick();
+        try {
+          const r = await fetch("/api/status", { cache: "no-store" }); const j = await r.json();
+          if (r.ok && j.app?.name === name) { $("swOverlay").className = "switching done"; $("swStep").textContent = "พร้อมแล้ว กำลังโหลดหน้าใหม่"; return setTimeout(() => location.reload(), 500); }
+        } catch { /* restarting */ }
+        if (Date.now() - t0 < 300000) setTimeout(waitUp, 2000); else fail("หน้าใหม่ไม่ตอบ ลองกด F5");
+      };
+      setTimeout(waitUp, 1500);
+    } catch { /* helper busy */ }
+  }, 1500);
+}
+
+// ---------- logs ----------
+let logTarget = null, logTimer = null;
+document.addEventListener("click", e => {
+  const b = e.target.closest("button[data-log]");
+  if (!b || !b.dataset.log) return;
+  logTarget = { id: b.dataset.log, slot: b.dataset.slot, task: b.dataset.task };
+  $("logCard").hidden = false; $("logScrim").hidden = false;
+  $("logTitle").textContent = `Log ของ slot ${logTarget.slot}`;
+  $("logBox").textContent = "กำลังโหลด…";
+  loadLogs(true);
+  $("logClose").focus();
+});
+async function loadLogs(toBottom) {
+  if (!logTarget) return;
+  const tail = $("logTail").value;
+  $("logOpen").href = `/api/logs?container=${logTarget.id}&tail=${tail}&format=text`;
+  try {
+    const r = await fetch(`/api/logs?container=${logTarget.id}&tail=${tail}`);
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.status);
+    const box = $("logBox");
+    const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+    const f = $("logFilter").value.trim().toLowerCase();
+    let lines = j.text.split("\n");
+    if ($("logErr").checked) lines = lines.filter(l => / (ERROR|WARN) |Exception|^\s+at /.test(l));
+    if (f) lines = lines.filter(l => l.toLowerCase().includes(f));
+    const fe = esc(f).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    box.innerHTML = lines.map(l => {
+      let h = esc(l);
+      if (f) h = h.replace(new RegExp(fe, "gi"), m => `<mark>${m}</mark>`);
+      return / ERROR |Exception/.test(l) ? `<span class="e">${h}</span>` : / WARN /.test(l) ? `<span class="w">${h}</span>` : h;
+    }).join("\n");
+    $("logInfo").textContent = `task ${logTarget.task}, container ${j.containerId} (${j.state}) แสดง ${lines.length} บรรทัด อัปเดต ${new Date().toLocaleTimeString("th-TH")}`;
+    if (toBottom || atBottom) box.scrollTop = box.scrollHeight;
+  } catch (e) { $("logInfo").textContent = "โหลด log ไม่ได้: " + e.message; }
+}
+function logLoop() { clearInterval(logTimer); logTimer = $("logAuto").checked ? setInterval(() => { if (!$("logCard").hidden) loadLogs(false); }, 3000) : null; }
+$("logAuto").onchange = logLoop; logLoop();
+$("logRefresh").onclick = () => loadLogs(true);
+$("logTail").onchange = () => loadLogs(true);
+$("logErr").onchange = () => loadLogs(true);
+$("logFilter").oninput = () => loadLogs(false);
+function closeLog() { $("logCard").hidden = true; $("logScrim").hidden = true; logTarget = null; }
+$("logClose").onclick = closeLog;
+$("logScrim").onclick = closeLog;
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("logCard").hidden) closeLog(); });
+
+refresh();
+setInterval(() => { if (!busy) refresh(); }, 3000);
+
+// ---------- app window lifecycle: the helper stops the stack once the last Replica Lab window is closed ----------
+const PAGE_ID = Math.random().toString(36).slice(2);
+const lifePing = () => fetch(`${BUILDER}/ping?p=${PAGE_ID}`).catch(() => {});
+setInterval(lifePing, 10000);
+lifePing();
+addEventListener("pagehide", () => { try { navigator.sendBeacon(`${BUILDER}/bye`, JSON.stringify({ p: PAGE_ID })); } catch { /* helper gone */ } });
+addEventListener("pageshow", e => e.persisted && lifePing());
+document.addEventListener("visibilitychange", () => !document.hidden && lifePing());
+</script>
+</body>
+</html>

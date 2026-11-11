@@ -1,0 +1,4 @@
+config/
+builder/*.log
+# secrets / this machine only
+apps/*.local.env

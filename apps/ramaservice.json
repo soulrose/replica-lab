@@ -1,0 +1,14 @@
+{
+  "name": "ramaservice",
+  "title": "ramaservice",
+  "image": "harbor.rama.mahidol.ac.th/newhis/ramaservice:master",
+  "kind": "spring",
+  "port": 8080,
+  "hostPort": 18080,
+  "health": "/actuator/health/liveness",
+  "startPeriod": 180,
+  "memoryMb": 1200,
+  "test": "graphql",
+  "buildLocal": true,
+  "note": "Spring Boot, profile dev, อ่านค่าจาก vault-dev"
+}
