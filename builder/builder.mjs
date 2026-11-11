@@ -76,6 +76,67 @@ function switchApp(name, tune) {
   return view(launch);
 }
 
+// ---------- vault token of an app that reads its settings from Vault (ramaservice) ----------
+// The token lives in apps\<name>.local.env (this machine only). The page shows whether Vault still accepts it
+// (auth/token/lookup-self: expiry, TTL) and takes a new one when it ran out; saving redeploys the app if it runs.
+const VAULT_KEY = "SPRING_CLOUD_VAULT_TOKEN";
+function envValue(file, key) {
+  try {
+    for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+      const i = line.indexOf("=");
+      if (i > 0 && line.slice(0, i).trim() === key) return line.slice(i + 1).trim();
+    }
+  } catch { /* no file */ }
+  return "";
+}
+const vaultUri = name => envValue(path.join(APPS, `${name}.env`), "SPRING_CLOUD_VAULT_URI").replace(/\/+$/, "");
+// PowerShell, not Node: Windows' proxy settings and certificate store apply. The token goes in the environment,
+// never on the command line.
+function lookupToken(uri, token) {
+  const ps = `$ErrorActionPreference = 'Stop'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+try {
+  $r = Invoke-RestMethod -Uri ($env:RL_VAULT + '/v1/auth/token/lookup-self') -Headers @{ 'X-Vault-Token' = $env:RL_TOKEN } -TimeoutSec 8 -UseBasicParsing
+  @{ ok = $true; expireTime = $r.data.expire_time; ttl = $r.data.ttl; renewable = $r.data.renewable } | ConvertTo-Json -Compress
+} catch {
+  $s = 0; try { $s = [int]$_.Exception.Response.StatusCode } catch { }
+  @{ ok = $false; status = $s; error = $_.Exception.Message } | ConvertTo-Json -Compress
+}`;
+  return new Promise(resolve => {
+    execFile("powershell.exe", ["-NoProfile", "-Command", ps], { cwd: ROOT, windowsHide: true, timeout: 20000,
+      env: { ...process.env, RL_VAULT: uri, RL_TOKEN: token } }, (err, out) => {
+      try { resolve(JSON.parse(String(out).trim().split(/\r?\n/).pop())); }
+      catch { resolve({ ok: false, status: 0, error: err ? err.message : "อ่านคำตอบของ vault ไม่ได้" }); }
+    });
+  });
+}
+async function vaultStatus(name) {
+  const uri = vaultUri(name);
+  if (!uri) return { vault: false };
+  const file = path.join(APPS, `${name}.local.env`);
+  const token = envValue(file, VAULT_KEY);
+  let savedAt = null; try { savedAt = fs.statSync(file).mtime.toISOString(); } catch { /* none yet */ }
+  return { vault: true, uri, set: !!token, savedAt, check: token ? await lookupToken(uri, token) : null };
+}
+async function setVaultToken(name, token) {
+  token = String(token || "").trim();
+  if (!/^[A-Za-z0-9._-]{8,512}$/.test(token)) throw new Error("token ไม่ถูกรูปแบบ (ตัวอักษร ตัวเลข . _ - ไม่มีช่องว่าง)");
+  const uri = vaultUri(name);
+  if (!uri) throw new Error(`แอป ${name} ไม่ได้อ่านค่าจาก vault`);
+  const check = await lookupToken(uri, token);
+  if (!check.ok && (check.status === 401 || check.status === 403)) throw new Error("vault ไม่รับ token นี้ (หมดอายุหรือไม่ถูกต้อง) ยังไม่ได้บันทึก");
+  const file = path.join(APPS, `${name}.local.env`);
+  let lines = []; try { lines = fs.readFileSync(file, "utf8").split(/\r?\n/); } catch { lines = [`# secrets for ${name} on this machine only (KEY=value per line, not in git)`]; }
+  const at = lines.findIndex(l => { const i = l.indexOf("="); return i > 0 && l.slice(0, i).trim() === VAULT_KEY; });
+  if (at >= 0) lines[at] = `${VAULT_KEY}=${token}`; else lines.push(`${VAULT_KEY}=${token}`);
+  fs.writeFileSync(file, lines.filter((l, i) => l || i < lines.length - 1).join("\n") + "\n");
+  log(`vault token of ${name} replaced`);
+  // the running app reads env files only when it is deployed: redeploy = Swarm restarts the replicas one by one
+  const restarting = (await runningApp()) === name && launch?.state !== "running";
+  if (restarting) switchApp(name, false);
+  return { saved: true, check, restarting };
+}
+
 // ---------- apps: profiles in apps\<name>.json (+ .env, + .tests.json) ----------
 const APPS = path.join(ROOT, "apps");
 fs.mkdirSync(APPS, { recursive: true });                      // a fresh copy has no apps yet
@@ -596,6 +657,8 @@ http.createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/launch/start") return send(res, origin, 202, await startLaunch());
     if (req.method === "GET" && url.pathname === "/apps") return send(res, origin, 200, await listApps());
     if (req.method === "GET" && url.pathname === "/apps/env") return send(res, origin, 200, { env: readEnv(url.searchParams.get("name")) });
+    if (req.method === "GET" && url.pathname === "/apps/vault") return send(res, origin, 200, await vaultStatus(checkName(url.searchParams.get("name"))));
+    if (req.method === "POST" && url.pathname === "/apps/vault") { const b = parse(await readBody(req)); return send(res, origin, 200, await setVaultToken(checkName(b.name), b.token)); }
     if (req.method === "POST" && url.pathname === "/apps/save") return send(res, origin, 200, { profile: await saveApp(parse(await readBody(req))) });
     if (req.method === "POST" && url.pathname === "/apps/switch") { const b = parse(await readBody(req)); return send(res, origin, 202, switchApp(checkName(b.name), !!b.tune)); }
     if (req.method === "GET" && url.pathname === "/about") return send(res, origin, 200, await about());

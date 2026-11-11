@@ -210,6 +210,8 @@
   .bar { height: 10px; border-radius: 5px; background: #e7e5f8; overflow: hidden; min-width: 80px; }
   .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--violet)); }
   details.sheet { margin-top: 18px; }
+  .vault-state { font: 600 13.5px/1.5 var(--font); padding: 8px 12px; border: 2px solid var(--ink); border-radius: var(--r-sm); background: var(--card-2); }
+  .vault-state.ok { background: var(--green-soft); } .vault-state.warn { background: var(--orange-soft); } .vault-state.bad { background: var(--red-soft); }
   .no-app-card { display: grid; gap: 10px; justify-items: start; max-width: 760px; }
   .no-app-card h2 { margin: 0; }
   .no-app-card p, .no-app-card ul { margin: 0; }
@@ -410,6 +412,18 @@
         <button id="pullBtn">Pull อย่างเดียว</button>
       </div>
       <div class="msg" id="pullMsg"></div>
+      <div id="vaultBox" hidden>
+        <div class="divider"></div>
+        <div class="field"><span>Vault token (แอปนี้อ่านค่าตั้งจาก vault)</span></div>
+        <div class="vault-state" id="vaultState" aria-live="polite">กำลังเช็ค…</div>
+        <div class="row" style="margin-top:10px">
+          <input type="password" id="vaultIn" autocomplete="off" spellcheck="false" placeholder="วาง token ใหม่" aria-label="vault token ใหม่" style="flex:1 1 200px">
+          <button class="primary" id="vaultBtn">บันทึกแล้วรีสตาร์ท</button>
+          <button id="vaultCheck">เช็คอีกครั้ง</button>
+        </div>
+        <p class="hint" style="margin-top:6px">เก็บไว้ในเครื่องนี้ที่ <code>apps\<span id="vaultFile">แอป</span>.local.env</code> เช็คกับ vault ก่อนบันทึก ถ้า vault ไม่รับจะไม่บันทึก</p>
+        <div class="msg" id="vaultMsg"></div>
+      </div>
       <div class="divider"></div>
       <label class="field"><span>ประตูฐาน (port ที่ใช้เรียก service จากเครื่องนี้)</span>
         <div class="row"><input type="number" id="portIn" min="1024" max="65535" style="width:110px"><button id="portBtn">เปลี่ยน port</button></div>
@@ -1149,7 +1163,48 @@ function onAppChanged(app) {
     : `ยิง <code>GET ${esc(app.health)}</code> ผ่าน VIP ของ service โดยเปิด connection ใหม่ทุกครั้ง (แอปนี้ไม่มี metrics ต่อ replica จึงนับรวมได้อย่างเดียว)`;
   gql = null;                          // another app = another schema
   loadTests();
+  loadVault();
 }
+
+// ---------- vault token (apps that read their settings from Vault, e.g. ramaservice) ----------
+async function loadVault() {
+  const box = $("vaultBox");
+  if (!APP || APP.attached) { box.hidden = true; return; }
+  let v;
+  try { v = await builder("GET", `/apps/vault?name=${encodeURIComponent(APP.name)}`); } catch { box.hidden = true; return; }
+  box.hidden = !v.vault;
+  if (!v.vault) return;
+  $("vaultFile").textContent = APP.name;
+  const st = $("vaultState"), c = v.check || {};
+  if (!v.set) { st.className = "vault-state bad"; st.textContent = "ยังไม่มี token replica อ่านค่าจาก vault ไม่ได้ ใส่ token ด้านล่าง"; return; }
+  if (c.ok) {
+    const exp = c.expireTime ? new Date(c.expireTime) : null;
+    const days = exp ? Math.floor((Number(c.ttl) || 0) / 86400) : null;
+    st.className = "vault-state " + (days != null && days < 7 ? "warn" : "ok");
+    st.textContent = exp
+      ? `vault รับ token นี้ หมดอายุ ${exp.toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })} (อีก ${days} วัน)${days < 7 ? " ใกล้หมดแล้ว ขอ token ใหม่จากทีม" : ""}`
+      : "vault รับ token นี้ ไม่มีวันหมดอายุ";
+  } else if (c.status === 401 || c.status === 403) {
+    st.className = "vault-state bad"; st.textContent = "vault ไม่รับ token นี้แล้ว (หมดอายุหรือถูกยกเลิก) replica จะเริ่มไม่สำเร็จ ใส่ token ใหม่ด้านล่าง";
+  } else {
+    st.className = "vault-state warn"; st.textContent = "เช็คกับ vault ไม่ได้: " + (c.error || "ไม่ทราบสาเหตุ");
+  }
+}
+$("vaultCheck").onclick = () => { $("vaultState").className = "vault-state"; $("vaultState").textContent = "กำลังเช็ค…"; loadVault(); };
+$("vaultBtn").onclick = async () => {
+  const token = $("vaultIn").value.trim();
+  const m = $("vaultMsg");
+  if (!token) { m.className = "msg err"; m.textContent = "วาง token ใหม่ก่อน"; $("vaultIn").focus(); return; }
+  $("vaultBtn").disabled = true; m.className = "msg"; m.textContent = "กำลังเช็ค token กับ vault…";
+  try {
+    const r = await builder("POST", "/apps/vault", { name: APP.name, token });
+    $("vaultIn").value = "";
+    m.textContent = r.restarting ? "บันทึกแล้ว replica กำลังเริ่มใหม่ทีละตัวด้วย token ใหม่" : "บันทึกแล้ว ใช้ตอนเปิดแอปนี้ครั้งต่อไป";
+    loadVault();
+  } catch (e) { m.className = "msg err"; m.textContent = e.message; }
+  finally { $("vaultBtn").disabled = false; }
+};
+setInterval(() => { if (!document.hidden && !$("vaultBox").hidden) loadVault(); }, 600000);
 
 // the test on screen <-> a saved test (apps\<app>.tests.json through the helper)
 function currentTest() {

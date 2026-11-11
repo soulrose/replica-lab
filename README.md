@@ -106,11 +106,12 @@ LABEL rama.lab.kind="tomcat" rama.lab.port="8080" rama.lab.health="/PatientProfi
 
 ## ramaservice
 - ใช้ profile `dev` อ่านค่าจาก vault-dev ด้วย token ของทีมใน `apps\ramaservice.local.env` (`SPRING_CLOUD_VAULT_TOKEN=...`)
-- **token หมดอายุ:** replica จะขึ้นไม่สำเร็จและเริ่มใหม่วนไป ใน log มีข้อความจาก vault เช่น `403` หรือ `permission denied` (กด ดู log ทุกตัว แล้วกรองคำ `vault`) วิธีแก้:
+- **ช่อง Vault token** (ในคลังยูนิต แสดงเฉพาะแอปที่อ่านค่าจาก vault คือ ramaservice) บอกว่า vault ยังรับ token ไหมและหมดอายุวันไหน (เหลือน้อยกว่า 7 วันเป็นสีส้ม ใช้ไม่ได้แล้วเป็นสีแดง) เช็คใหม่ทุก 10 นาที
+- **token หมดอายุ:** replica จะขึ้นไม่สำเร็จและเริ่มใหม่วนไป วิธีแก้:
   1. ขอ token ใหม่จากทีม
-  2. เปิด `apps\ramaservice.local.env` ด้วย Notepad แก้ค่าหลัง `SPRING_CLOUD_VAULT_TOKEN=` แล้วบันทึก
-  3. ปิดหน้าต่าง Replica Lab แล้วเปิดใหม่ ตอนเปิดระบบจะ deploy ใหม่และอ่าน token ใหม่ (ทางอื่นที่ใช้ได้: รัน `run-local.ps1` เมื่อ stack ยังรันอยู่ ระบบจะทยอยรีสตาร์ท replica ทีละตัว)
-  - ต้องแก้ทุกเครื่อง เพราะไฟล์นี้อยู่ในเครื่องใครเครื่องมัน และการอัปเดตไม่แตะไฟล์นี้ ส่วนชุดของทีมที่จะส่งรอบต่อไป ให้แก้ไฟล์นี้ในเครื่องที่ทำชุดแล้วรัน `make-package.ps1` ใหม่
+  2. วางในช่อง Vault token แล้วกด **บันทึกแล้วรีสตาร์ท** ระบบเช็คกับ vault ก่อน ถ้า vault ไม่รับจะไม่บันทึก ถ้ารับจะเขียนลง `apps\ramaservice.local.env` แล้ว deploy ใหม่ replica เริ่มใหม่ทีละตัว
+  - หรือแก้เองใน `apps\ramaservice.local.env` (`SPRING_CLOUD_VAULT_TOKEN=...`) แล้วปิดและเปิด Replica Lab ใหม่
+  - ต้องทำทุกเครื่อง เพราะไฟล์นี้อยู่ในเครื่องใครเครื่องมัน และการอัปเดตไม่แตะ ส่วนชุดของทีมที่จะส่งรอบต่อไป ให้เปลี่ยน token ในเครื่องที่ทำชุดก่อนรัน `make-package.ps1`
 - ปิด Liquibase (`SPRING_LIQUIBASE_ENABLED` และ `RAMA_LIQUIBASE_ENABLED`), Quartz และ Eureka ไว้ replica ในเครื่องจึงไม่แก้ schema ไม่รัน job และไม่ไปลงทะเบียนกับ dev
 - **build local:** ในหน้าเว็บเลือก worktree ของ ramaservice แล้วกด Build ได้ image `ramaservice:local-<branch>` ที่รวมไฟล์ที่ยังไม่ commit
 
