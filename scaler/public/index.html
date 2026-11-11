@@ -1211,14 +1211,18 @@ $("uApply").onclick = async () => {
   clearInterval(switchTimer);
   switchTimer = setInterval(async () => {
     $("swTime").textContent = `ผ่านไป ${Math.round((Date.now() - t0) / 1000)} วินาที หน้านี้จะโหลดใหม่เองเมื่อเสร็จ`;
+    // the page itself reports the new version once restart-after-update.ps1 has redeployed it: that is the finish line
+    try {
+      const r = await fetch("/api/status", { cache: "no-store" }); const s = await r.json();
+      if (r.ok && s.version === target) { clearInterval(switchTimer); $("swOverlay").className = "switching done"; $("swStep").textContent = "อัปเดตแล้ว กำลังโหลดหน้าใหม่"; setTimeout(() => location.reload(), 600); return; }
+    } catch { /* page restarting */ }
     try {
       const j = await builder("GET", "/update/status");
-      $("swLog").textContent = (j.lines || []).slice(-10).join("\n");
+      if (j.state === "running" || j.state === "done" || j.state === "error") $("swLog").textContent = (j.lines || []).slice(-10).join("\n");
       if (j.state === "error") return fail("อัปเดตไม่สำเร็จ ดูข้อความด้านล่าง");
-      $("swStep").textContent = j.state === "done" ? "ติดตั้งแล้ว กำลังเริ่มใหม่…" : "กำลังดาวน์โหลดและติดตั้ง…";
+      $("swStep").textContent = j.state === "running" ? "กำลังดาวน์โหลดและติดตั้ง…" : "ติดตั้งแล้ว กำลังเริ่มตัวช่วยและหน้าใหม่ด้วยเวอร์ชันใหม่…";
     } catch {
       $("swStep").textContent = "กำลังเริ่มตัวช่วยและหน้าใหม่ด้วยเวอร์ชันใหม่…";
-      try { const r = await fetch("/api/status", { cache: "no-store" }); const s = await r.json(); if (r.ok && s.version === target) { clearInterval(switchTimer); $("swOverlay").className = "switching done"; $("swStep").textContent = "อัปเดตแล้ว กำลังโหลดหน้าใหม่"; setTimeout(() => location.reload(), 600); } } catch { /* page restarting */ }
     }
     if (Date.now() - t0 > 600000) fail("ใช้เวลานานเกินไป ลองปิดแล้วเปิด Replica Lab ใหม่");
   }, 2000);
