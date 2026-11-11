@@ -21,7 +21,9 @@ function Out-Json($o) { [Console]::OutputEncoding = [Text.Encoding]::UTF8; $o | 
 
 if ($Check) {
     try {
-        $tags = @(Get-Api "tags?per_page=100") | Where-Object { Get-Ver $_.name }
+        # PowerShell 5.1 hands a JSON array from Invoke-RestMethod down the pipe as ONE item; store it first so it is enumerated
+        $all = Get-Api "tags?per_page=100"
+        $tags = @($all | ForEach-Object { $_ } | Where-Object { Get-Ver ([string]$_.name) })
         if (-not $tags) { Out-Json @{ current = $current; latest = $null; newer = $false; error = "ยังไม่มี tag เวอร์ชันใน repo" }; exit 0 }
         $latest = ($tags | Sort-Object { Get-Ver $_.name } -Descending | Select-Object -First 1).name
         $newer = (Get-Ver $latest) -gt (Get-Ver $current)

@@ -2,6 +2,9 @@
 
 เลขเวอร์ชันแบบ MAJOR.MINOR.PATCH: แก้บั๊ก = PATCH, เพิ่มความสามารถ = MINOR, เปลี่ยนแบบที่ของเดิมใช้ไม่ได้ (เช่น รูปแบบโปรไฟล์แอป) = MAJOR
 
+## 1.0.2 - 2026-11-11
+- แก้เช็คอัปเดต: เมื่อ repo มีหลาย tag แล้วขึ้นว่า "ยังไม่มี tag" (PowerShell 5.1 ส่งรายการ tag มาเป็นก้อนเดียว)
+
 ## 1.0.1 - 2026-11-11
 - หน้า About แสดงผู้พัฒนา: DevTeam, Information Technology, Faculty of Medicine Ramathibodi Hospital, Mahidol University
 - ไม่แสดงแหล่งอัปเดต (ชื่อ repo) ในหน้า About และข้อความแจ้งเตือน

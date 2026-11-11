@@ -57,7 +57,7 @@ LABEL rama.lab.kind="tomcat" rama.lab.port="8080" rama.lab.health="/PatientProfi
 
 **ออกเวอร์ชันใหม่ (คนดูแล):**
 1. แก้เลขใน `VERSION` และเพิ่มหัวข้อ `## x.y.z - วันที่` ใน `CHANGELOG.md`
-2. commit, `git tag vx.y.z`, `git push --follow-tags`
+2. commit, `git tag vx.y.z`, `git push` แล้ว `git push origin vx.y.z` (tag ต้อง push แยก)
 3. เครื่องทีมจะเห็นป้าย "มีเวอร์ชันใหม่" ภายใน 10 นาทีหลังเปิดโปรแกรม
 
 **ความลับ:** vault token ของ ramaservice อยู่ใน `apps\ramaservice.local.env` ซึ่งไม่ขึ้น git (repo เป็นสาธารณะ) zip ที่ส่งให้ทีม (`make-package.ps1`) มีไฟล์นี้ ถ้าติดตั้งจาก GitHub ให้ขอ token จากทีมแล้วใส่ไฟล์นี้เอง
