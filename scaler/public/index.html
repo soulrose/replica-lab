@@ -250,6 +250,14 @@
   #swLog { margin: 12px 0 0; max-height: 170px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11.5px/1.45 var(--mono);
            color: #c9f7dc; background: #17143a; border: 2px solid var(--ink); border-radius: var(--r-sm); padding: 8px 10px; }
   #swActions { margin-top: 14px; }
+  /* close X on every dialog */
+  .x-close { width: 38px; height: 38px; padding: 0; display: inline-grid; place-items: center; flex: none; margin-left: auto; border-radius: 10px; }
+  .x-close svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
+  .sw-card { position: relative; }
+  .sw-card h2 { padding-right: 46px; }
+  .sw-card .x-close { position: absolute; top: 14px; right: 14px; }
+  /* determinate progress: the bar shows how far the job is */
+  .switching.det .sw-track i { animation: none; margin-left: 0; transition: width .5s ease; }
   dl.sel { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0; font-size: 13.5px; }
   dl.sel dt { color: var(--muted); font-weight: 600; } dl.sel dd { margin: 0; overflow-wrap: anywhere; }
   .brand { cursor: pointer; }
@@ -488,6 +496,7 @@
 
 <div class="switching" id="swOverlay" hidden role="alertdialog" aria-labelledby="swTitle" aria-live="polite">
   <div class="sw-card">
+    <button class="x-close" id="swX" aria-label="ปิด" title="ซ่อนหน้าต่างนี้ (Esc)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"/></svg></button>
     <h2 id="swTitle">กำลังสลับแอป</h2>
     <div class="sw-step" id="swStep">กำลังเริ่ม…</div>
     <div class="sw-track"><i></i></div>
@@ -498,7 +507,7 @@
 </div>
 <div class="scrim" id="aboutScrim" hidden></div>
 <aside id="aboutCard" class="drawer" hidden aria-labelledby="aboutTitle" role="dialog">
-  <div class="head"><h2 id="aboutTitle">เกี่ยวกับ Replica Lab</h2><button class="quiet" id="aboutClose">ปิด</button></div>
+  <div class="head"><h2 id="aboutTitle">เกี่ยวกับ Replica Lab</h2><button class="x-close" id="aboutClose" aria-label="ปิด" title="ปิด (Esc)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"/></svg></button></div>
   <p class="hint" style="margin:0 0 12px">รันแอปจาก image ในเครื่องเป็นหลาย replica บน Docker Swarm ปรับจำนวนขึ้นลง ดู log ทีละตัว และทดสอบส่งซ้ำข้าม replica</p>
   <dl class="sel">
     <dt>ผู้พัฒนา</dt><dd>DevTeam, Information Technology<br>Faculty of Medicine Ramathibodi Hospital, Mahidol University</dd>
@@ -530,7 +539,7 @@
 </aside>
 <div class="scrim" id="appScrim" hidden></div>
 <aside id="appCard" class="drawer" hidden aria-labelledby="appTitle" role="dialog">
-  <div class="head"><h2 id="appTitle">แอป<small>รันได้ทีละแอป สลับแล้วแอปเดิมหยุดและจำค่าไว้</small></h2><button class="quiet" id="appClose">ปิด</button></div>
+  <div class="head"><h2 id="appTitle">แอป<small>รันได้ทีละแอป สลับแล้วแอปเดิมหยุดและจำค่าไว้</small></h2><button class="x-close" id="appClose" aria-label="ปิด" title="ปิด (Esc)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"/></svg></button></div>
   <div id="appList" class="app-list"></div>
   <div class="divider"></div>
   <h2 style="font-size:16px">service ที่รันอยู่ใน swarm ของเครื่องนี้</h2>
@@ -588,7 +597,7 @@
 
 <div class="scrim" id="logScrim" hidden></div>
 <aside id="logCard" hidden aria-labelledby="logTitle" role="dialog">
-  <div class="head"><h2 id="logTitle">Log</h2><button class="quiet" id="logClose">ปิด</button></div>
+  <div class="head"><h2 id="logTitle">Log</h2><button class="x-close" id="logClose" aria-label="ปิด" title="ปิด (Esc)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"/></svg></button></div>
   <div class="row">
     <select id="logTail" aria-label="จำนวนบรรทัดล่าสุด"><option value="200">200 บรรทัด</option><option value="500" selected>500 บรรทัด</option><option value="2000">2,000 บรรทัด</option><option value="10000">10,000 บรรทัด</option></select>
     <input type="text" id="logFilter" placeholder="กรองคำ เช่น ERROR, Idempotency, traceId" spellcheck="false" style="flex:1 1 200px">
@@ -1208,6 +1217,7 @@ $("uApply").onclick = async () => {
   if (!tag || !confirm(`อัปเดต Replica Lab เป็น ${target}?\n\nระบบจะดาวน์โหลดเวอร์ชันใหม่ เขียนทับไฟล์โปรแกรม (ไม่แตะ config, ความลับ และโปรไฟล์แอปที่มีอยู่) แล้วเริ่มหน้าใหม่ แอปที่ลงสนามยังรันต่อ`)) return;
   closeAbout();
   showSwitching(`กำลังอัปเดตเป็น ${target}`);
+  setProgress(5, "กำลังเริ่มอัปเดต");
   const t0 = Date.now();
   const fail = msg => { clearInterval(switchTimer); $("swOverlay").className = "switching err"; $("swStep").textContent = msg; $("swActions").hidden = false; };
   try { await builder("POST", "/update/apply", { tag }); } catch (e) { return fail("อัปเดตไม่ได้: " + e.message); }
@@ -1217,15 +1227,15 @@ $("uApply").onclick = async () => {
     // the page itself reports the new version once restart-after-update.ps1 has redeployed it: that is the finish line
     try {
       const r = await fetch("/api/status", { cache: "no-store" }); const s = await r.json();
-      if (r.ok && s.version === target) { clearInterval(switchTimer); $("swOverlay").className = "switching done"; $("swStep").textContent = "อัปเดตแล้ว กำลังโหลดหน้าใหม่"; setTimeout(() => location.reload(), 600); return; }
+      if (r.ok && s.version === target) { clearInterval(switchTimer); setProgress(100, "อัปเดตแล้ว กำลังโหลดหน้าใหม่"); $("swOverlay").classList.add("done"); setTimeout(() => location.reload(), 600); return; }
     } catch { /* page restarting */ }
     try {
       const j = await builder("GET", "/update/status");
-      if (j.state === "running" || j.state === "done" || j.state === "error") $("swLog").textContent = (j.lines || []).slice(-10).join("\n");
+      if (j.lines?.length) { $("swLog").textContent = j.lines.slice(-10).join("\n"); $("swLog").scrollTop = 1e6; }
       if (j.state === "error") return fail("อัปเดตไม่สำเร็จ ดูข้อความด้านล่าง");
-      $("swStep").textContent = j.state === "running" ? "กำลังดาวน์โหลดและติดตั้ง…" : "ติดตั้งแล้ว กำลังเริ่มตัวช่วยและหน้าใหม่ด้วยเวอร์ชันใหม่…";
+      const [pc, tx] = updateStep(j); setProgress(pc, tx);
     } catch {
-      $("swStep").textContent = "กำลังเริ่มตัวช่วยและหน้าใหม่ด้วยเวอร์ชันใหม่…";
+      setProgress(48, "กำลังเริ่มตัวช่วยใหม่");      // the old helper has gone, the new one is not up yet
     }
     if (Date.now() - t0 > 600000) fail("ใช้เวลานานเกินไป ลองปิดแล้วเปิด Replica Lab ใหม่");
   }, 2000);
@@ -1457,24 +1467,63 @@ async function saveForm(andUse) {
 $("nSave").onclick = () => saveForm(false);
 $("nSaveUse").onclick = () => saveForm(true);
 // what run-local.ps1 is doing, in plain words, from its latest output
+// [percent, text] from the last line run-local.ps1 printed
 function switchStep(lines, name) {
   const l = [...lines].reverse().join("\n");
   const last = l.split("\n")[0] || "";
-  if (/stack deploy|retry/i.test(last)) return `กำลังส่ง ${name} ลงสนาม (deploy)`;
-  if (/watching RAM|peak/i.test(last)) return "กำลังวัด RAM ของแอป";
-  if (/RAM auto|trial/i.test(last)) return "กำลังรัน container ทดลองเพื่อวัด RAM";
-  if (/page image/i.test(last)) return "กำลังเตรียมหน้า Replica Lab";
-  if (/^== image/i.test(last)) return "กำลังเช็ค image";
-  if (/recreating/i.test(last)) return "กำลังสร้าง service ใหม่ (port หรือแอปเปลี่ยน)";
-  if (/stopping/i.test(last)) return "กำลังหยุดแอปเดิม (จำค่าไว้ให้)";
-  if (/^== app/i.test(last)) return `กำลังเตรียม ${name}`;
-  return "กำลังเช็ค Docker";
+  if (/stack deploy|retry/i.test(last)) return [80, `กำลังส่ง ${name || "แอป"} ลงสนาม (deploy)`];
+  if (/watching RAM|peak/i.test(last)) return [55, "กำลังวัด RAM ของแอป"];
+  if (/RAM auto|trial/i.test(last)) return [45, "กำลังรัน container ทดลองเพื่อวัด RAM"];
+  if (/page image/i.test(last)) return [65, "กำลังเตรียมหน้า Replica Lab"];
+  if (/^== image/i.test(last)) return [35, "กำลังเช็ค image"];
+  if (/recreating/i.test(last)) return [30, "กำลังสร้าง service ใหม่ (port หรือแอปเปลี่ยน)"];
+  if (/stopping/i.test(last)) return [25, "กำลังหยุดแอปเดิม (จำค่าไว้ให้)"];
+  if (/attach to|no network/i.test(last)) return [30, "กำลังเชื่อม service ใน swarm"];
+  if (/^== app/i.test(last)) return [20, `กำลังเตรียม ${name || "แอป"}`];
+  return [10, "กำลังเช็ค Docker"];
+}
+// [percent, text] for an update: this helper's download job, then the restart log the new helper serves
+function updateStep(j) {
+  const lines = j.lines || [];
+  const last = lines.filter(l => j.state === "running" || l.startsWith("== ") || /^Replica Lab http/.test(l)).pop() || "";
+  if (j.state === "running") {
+    if (/^updated to/i.test(last)) return [42, "ติดตั้งไฟล์แล้ว"];
+    if (/^unpacking/i.test(last)) return [30, "กำลังแตกไฟล์"];
+    if (/^downloading/i.test(last)) return [15, "กำลังดาวน์โหลดเวอร์ชันใหม่"];
+    return [8, "กำลังเริ่มอัปเดต"];
+  }
+  if (j.state === "done") return [45, "ติดตั้งไฟล์แล้ว กำลังเริ่มตัวช่วยใหม่"];
+  if (/^Replica Lab http|^== restart done/.test(last)) return [92, "หน้าใหม่ขึ้นแล้ว รอตอบ"];
+  if (/stack deploy/i.test(last)) return [85, "กำลังเริ่มหน้าใหม่ (deploy)"];
+  if (/page image/i.test(last)) return [72, "กำลัง build หน้า Replica Lab เวอร์ชันใหม่"];
+  if (/^== (image|attach)/i.test(last)) return [66, "กำลังเช็คแอปที่ลงสนาม"];
+  if (/^== app/i.test(last)) return [62, "กำลังอ่านแอปที่ลงสนาม"];
+  if (/^== Docker/i.test(last)) return [57, "กำลังเช็ค Docker"];
+  if (/^== helper started/i.test(last)) return [54, "เริ่มตัวช่วยใหม่แล้ว"];
+  return [50, "กำลังเริ่มตัวช่วยใหม่"];
 }
 function showSwitching(title) {
-  $("swOverlay").hidden = false; $("swOverlay").className = "switching";
+  $("swOverlay").hidden = false; $("swOverlay").className = "switching"; $("swOverlay").querySelector(".sw-track i").style.width = "";
   $("swTitle").textContent = title; $("swStep").textContent = "กำลังเริ่ม…"; $("swLog").textContent = ""; $("swActions").hidden = true;
 }
 $("swClose").onclick = () => { $("swOverlay").hidden = true; };
+// progress in percent: the bar fills up and the step says where it is
+function setProgress(pct, text) {
+  const o = $("swOverlay"); o.classList.add("det");
+  pct = Math.max(3, Math.min(100, Math.round(pct)));
+  o.querySelector(".sw-track i").style.width = pct + "%";
+  $("swStep").textContent = `${text} · ${pct}%`;
+}
+// X / Esc: finished or failed = close; still working = hide it, the job goes on (stopping halfway could leave the app half switched)
+function hideSwitching() {
+  const o = $("swOverlay");
+  if (o.hidden) return;
+  const busy = !o.classList.contains("err") && !o.classList.contains("done");
+  if (busy && !confirm("ซ่อนหน้าต่างนี้?\n\nงานที่สั่งไว้ยังทำต่อเบื้องหลัง (หยุดกลางทางไม่ได้ เพราะอาจทิ้งแอปไว้ครึ่งๆ กลางๆ) เสร็จแล้วหน้านี้จะโหลดใหม่เอง")) return;
+  o.hidden = true;
+}
+$("swX").onclick = hideSwitching;
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("swOverlay").hidden) hideSwitching(); });
 async function switchTo(name, tune, attach) {
   const isRunning = !attach && name === (appData?.running || "");
   const q = attach ? `ควบคุม service ${attach} จาก Replica Lab? ปรับจำนวน replica / เริ่ม / หยุด / ดู log ของ service นี้ได้ตรงๆ โดยไม่สร้างตัวใหม่ แอปที่ลงสนามอยู่จะหยุด (จำค่าไว้ให้) ปิด Replica Lab แล้ว ${attach} ยังรันต่อ`
@@ -1498,10 +1547,10 @@ async function switchTo(name, tune, attach) {
       const lines = st.launch?.lines || [];
       $("swLog").textContent = lines.slice(-10).join("\n"); $("swLog").scrollTop = 1e6;
       if (st.launch?.state === "error") return fail("ไม่สำเร็จ ดูข้อความด้านล่าง");
-      if (st.launch?.state !== "done") { $("swStep").textContent = switchStep(lines, name); return; }
+      if (st.launch?.state !== "done") { const [pc, tx] = switchStep(lines, name); setProgress(pc, tx); return; }
       // the page service restarted with the new app: reload only once it answers with that app
       clearInterval(switchTimer);
-      $("swStep").textContent = "รอหน้าใหม่พร้อม…";
+      setProgress(90, "รอหน้าใหม่พร้อม");
       const waitUp = async () => {
         tick();
         try {

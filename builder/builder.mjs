@@ -377,6 +377,20 @@ function applyUpdate(tag) {
   return view(j);
 }
 
+// the download/copy job of this helper; after the hand-over the NEW helper has no job, so it reports the restart
+// (restart-after-update.ps1 writes builder\update.log for this run only)
+function updateStatus() {
+  if (updateJob) return view(updateJob);
+  const f = path.join(ROOT, "builder", "update.log");
+  try {
+    if (Date.now() - fs.statSync(f).mtimeMs > 10 * 60 * 1000) return {};
+    const lines = fs.readFileSync(f, "utf8").replace(/^﻿/, "").split(/\r?\n/).filter(Boolean);
+    if (!/^== restarting helper/.test(lines[0] || "")) return {};          // an older log format
+    const last = lines.filter(l => l.startsWith("== ")).pop() || "";
+    return { state: /^== restart failed/.test(last) ? "error" : /^== restart done/.test(last) ? "restarted" : "restart", lines: lines.slice(-60) };
+  } catch { return {}; }
+}
+
 // remove an app that is no longer used: its profile, env, saved tests and remembered state (not its image)
 async function deleteApp(name) {
   checkName(name);
@@ -586,7 +600,7 @@ http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/about") return send(res, origin, 200, await about());
     if (req.method === "GET" && url.pathname === "/update/check") return send(res, origin, 200, await checkUpdate(url.searchParams.get("force") === "1"));
     if (req.method === "POST" && url.pathname === "/update/apply") return send(res, origin, 202, applyUpdate(parse(await readBody(req)).tag));
-    if (req.method === "GET" && url.pathname === "/update/status") return send(res, origin, 200, view(updateJob) || {});
+    if (req.method === "GET" && url.pathname === "/update/status") return send(res, origin, 200, updateStatus());
     if (req.method === "POST" && url.pathname === "/update/token") return send(res, origin, 200, saveToken(parse(await readBody(req)).token));
     if (req.method === "GET" && url.pathname === "/folder/recent") return send(res, origin, 200, recentFolders());
     if (req.method === "POST" && url.pathname === "/folder/inspect") return send(res, origin, 200, inspectFolder(parse(await readBody(req)).dir));
