@@ -84,10 +84,14 @@ const readJsonFile = (f, dflt) => { try { return JSON.parse(fs.readFileSync(f, "
 const run = (cmd, args, timeout = 30000) => new Promise(resolve =>
   execFile(cmd, args, { windowsHide: true, timeout, maxBuffer: 20 * 1024 * 1024 }, (e, out, err) => resolve({ ok: !e, out: String(out || ""), err: String(err || e?.message || "") })));
 
+// the app on the page now: label of our own app service, else of the page (an attached swarm service has no app service of ours)
 async function runningApp() {
-  const r = await run("docker", ["service", "inspect", "replicalab_app", "--format", "{{json .Spec.Labels}}"]);
-  if (!r.ok) return null;
-  try { return JSON.parse(r.out)["rama.lab.app"] || null; } catch { return null; }
+  for (const svc of ["replicalab_app", "replicalab_scaler"]) {
+    const r = await run("docker", ["service", "inspect", svc, "--format", "{{json .Spec.Labels}}"]);
+    if (!r.ok) continue;
+    try { const n = JSON.parse(r.out)["rama.lab.app"]; if (n) return n; } catch { /* no labels */ }
+  }
+  return null;
 }
 async function listApps() {
   const apps = fs.readdirSync(APPS).filter(f => f.endsWith(".json") && !f.endsWith(".tests.json"))
@@ -157,9 +161,32 @@ async function detect(image) {
 async function swarmServices() {
   const r = await run("docker", ["service", "ls", "--format", "{{json .}}"]);
   if (!r.ok) throw new Error("อ่าน service ใน swarm ไม่ได้: " + r.err.slice(0, 200));
+  const attachedBy = new Map((await listApps()).apps.filter(a => a.attach).map(a => [a.attach, a.name]));
   return r.out.split(/\r?\n/).filter(Boolean).map(l => JSON.parse(l))
-    .filter(s => !s.Name.startsWith("replicalab_"))
-    .map(s => ({ name: s.Name, image: s.Image, replicas: s.Replicas, ports: s.Ports, mode: s.Mode }));
+    .filter(s => !s.Name.startsWith("replicalab_") && !String(s.Image).startsWith("replica-lab-scaler"))   // not Replica Lab's own pages
+    .map(s => ({ name: s.Name, image: s.Image, replicas: s.Replicas, ports: s.Ports, mode: s.Mode, app: attachedBy.get(s.Name) || null }));
+}
+
+// control a running swarm service in place: an app profile with "attach" (no image, no port of ours), then switch to it
+async function attachService(name, tune) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$/.test(name)) throw new Error("ชื่อ service ไม่ถูกต้อง");
+  const r = await run("docker", ["service", "inspect", name, "--format", "{{json .Spec}}"]);
+  if (!r.ok) throw new Error("ไม่พบ service " + name);
+  const spec = JSON.parse(r.out);
+  if (!spec.Mode?.Replicated) throw new Error(`${name} รันแบบ global (1 ตัวต่อเครื่อง) ปรับจำนวน replica ไม่ได้`);
+  const apps = (await listApps()).apps;
+  let p = apps.find(a => a.attach === name);
+  if (!p) {
+    const d = await importService(name);        // kind / port in the container / health / test, from the image and the service
+    const base = d.profile.name;
+    let n = base;
+    for (let i = 2; fs.existsSync(path.join(APPS, `${n}.json`)); i++) n = `${base.slice(0, 28)}-${i}`;
+    p = { name: n, title: name, attach: name, kind: d.profile.kind, port: d.profile.port, health: d.profile.health,
+          test: d.profile.test, startPeriod: d.profile.startPeriod };
+    fs.writeFileSync(path.join(APPS, `${n}.json`), JSON.stringify(p, null, 2));
+    log(`attach: app ${n} controls swarm service ${name}`);
+  }
+  return { app: p.name, launch: switchApp(p.name, tune) };
 }
 async function importService(name) {
   const r = await run("docker", ["service", "inspect", name, "--format", "{{json .Spec}}"]);
@@ -198,7 +225,7 @@ class FieldError extends Error { constructor(msg, fields) { super(msg); this.fie
 async function portOwners(except) {
   const owners = new Map([[APP_PORT, "หน้า Replica Lab"], [PORT, "ตัวช่วยของ Replica Lab"]]);
   for (const a of (await listApps()).apps) {
-    if (a.name === except) continue;
+    if (a.name === except || a.attach) continue;      // an attached service's port is listed below with the swarm services
     const st = readJsonFile(path.join(ROOT, "config", "state", `${a.name}.json`), null);
     owners.set(Number(st?.hostPort || a.hostPort), `แอป ${a.name}`);
   }
@@ -570,6 +597,7 @@ http.createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/apps/delete") return send(res, origin, 200, await deleteApp(String(parse(await readBody(req)).name || "")));
     if (req.method === "GET" && url.pathname === "/images") return send(res, origin, 200, await localImages());
     if (req.method === "GET" && url.pathname === "/swarm/services") return send(res, origin, 200, await swarmServices());
+    if (req.method === "POST" && url.pathname === "/swarm/attach") { const b = parse(await readBody(req)); return send(res, origin, 202, await attachService(String(b.name || ""), false)); }
     if (req.method === "POST" && url.pathname === "/swarm/import") return send(res, origin, 200, await importService(String(parse(await readBody(req)).name || "")));
     if (req.method === "POST" && url.pathname === "/detect") return send(res, origin, 200, await detect(String(parse(await readBody(req)).image || "")));
     if (req.method === "GET" && url.pathname === "/tests") return send(res, origin, 200, readTests(url.searchParams.get("app")));

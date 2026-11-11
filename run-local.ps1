@@ -63,6 +63,92 @@ if (-not $App) {
 $profileFile = Join-Path $PSScriptRoot "apps\$App.json"
 if (-not (Test-Path $profileFile)) { throw "no app profile apps\$App.json" }
 $p = Get-Content $profileFile -Raw -Encoding UTF8 | ConvertFrom-Json
+$ver = if (Test-Path (Join-Path $PSScriptRoot "VERSION")) { (Get-Content (Join-Path $PSScriptRoot "VERSION") -Raw).Trim() } else { "dev" }
+
+# An app with "attach": a swarm service that already runs on this PC (made by hand or by another stack).
+# Nothing is created or copied: the stack holds only the Replica Lab page, which joins the service's network
+# and scales / restarts that service in place. Closing Replica Lab leaves the service running as it is.
+if ("$($p.attach)") {
+    $svc = "$($p.attach)"
+    Step "attach to swarm service $svc"
+    $json = docker service inspect $svc --format "{{json .Spec}}" 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $json) { throw "swarm service $svc is not on this PC any more: start it again, or delete the app $App" }
+    $spec = ($json -join "") | ConvertFrom-Json
+    if (-not $spec.Mode.Replicated) { throw "$svc runs in global mode (one per node): its replicas cannot be set" }
+    if ($running -and $running.name) {
+        Write-Host "   stopping $($running.name) (remembered for next time)"
+        Save-RunningApp $Stack | Out-Null
+    }
+    [IO.File]::WriteAllText($currentFile, $App)
+    # the page reaches each replica over a network it shares with the service
+    $names = @()
+    foreach ($n in @($spec.TaskTemplate.Networks | ForEach-Object { $_.Target } | Where-Object { $_ })) {
+        $nm = docker network inspect $n --format "{{.Name}}" 2>$null
+        if ($LASTEXITCODE -eq 0 -and $nm -and "$nm" -ne "ingress") { $names += "$nm" }
+    }
+    if (-not $names) {
+        $link = "replicalab_link"
+        docker network inspect $link *> $null
+        if ($LASTEXITCODE -ne 0) { docker network create -d overlay --attachable $link | Out-Null }
+        Write-Host "   $svc has no network of its own: adding $link to it (its replicas restart once)"
+        docker service update --detach --network-add $link $svc | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "cannot add network $link to $svc" }
+        $names = @($link)
+    }
+    Step "Replica Lab page image"
+    docker build -q -t replica-lab-scaler:local .\scaler | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "docker build failed" }
+    $scalerId = (docker image inspect replica-lab-scaler:local --format "{{.Id}}").Split(":")[1].Substring(0, 12)
+    docker tag replica-lab-scaler:local "replica-lab-scaler:$scalerId"
+    $health = "$($p.health)"; if (-not $health.StartsWith("/")) { $health = "/$health" }
+    $maxR = [Math]::Max($Max, [int]$spec.Mode.Replicated.Replicas)
+    $netRefs = ($names | ForEach-Object -Begin { $i = 0 } -Process { "n$i"; $i++ }) -join ", "
+    $netDefs = ($names | ForEach-Object -Begin { $i = 0 } -Process { "  n${i}: { external: true, name: `"$_`" }"; $i++ }) -join "`n"
+    $yml = @"
+# written by run-local.ps1 for the attached app $App (swarm service $svc): only the Replica Lab page
+version: "3.8"
+services:
+  scaler:
+    image: replica-lab-scaler:$scalerId
+    environment:
+      TARGET_SERVICE: "$svc"
+      TARGET_PORT: "$([int]$p.port)"
+      APP_NAME: "$App"
+      APP_KIND: "$($p.kind)"
+      APP_HEALTH: "$health"
+      APP_TEST: "$($p.test)"
+      APP_BUILD_LOCAL: "false"
+      APP_MEMORY: "0"
+      APP_ATTACHED: "true"
+      RL_VERSION: "$ver"
+      SCALER_MAX: "$maxR"
+    ports:
+      - { target: 8090, published: $ScalerPort, protocol: tcp, mode: ingress }
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [$netRefs]
+    deploy:
+      replicas: 1
+      placement: { constraints: [node.role == manager] }
+      resources: { limits: { cpus: "0.5", memory: 128M } }
+      labels: { rama.lab.app: "$App", rama.lab.attach: "$svc" }
+networks:
+$netDefs
+"@
+    $ymlFile = Join-Path $PSScriptRoot "config\stack-attach.yml"
+    [IO.File]::WriteAllText($ymlFile, $yml)
+    Step "docker stack deploy $Stack (page only, controls $svc on network $($names -join ', '))"
+    for ($try = 1; $try -le 10; $try++) {
+        docker stack deploy -c $ymlFile --resolve-image never --prune $Stack     # --prune: our own app service goes
+        if ($LASTEXITCODE -eq 0) { break }
+        if ($try -eq 10) { throw "stack deploy failed" }
+        Write-Host "   previous stack still shutting down, retry in 3 s ($try/10)"
+        Start-Sleep 3
+    }
+    Write-Host ""
+    Write-Host "Replica Lab http://localhost:$ScalerPort   (controls swarm service $svc)" -ForegroundColor Green
+    exit 0
+}
 $envRel = "apps/$App.env"
 if (-not (Test-Path (Join-Path $PSScriptRoot $envRel))) { [IO.File]::WriteAllText((Join-Path $PSScriptRoot $envRel), "# environment for $App (KEY=value per line)`n") }
 # this machine only (tokens / passwords): not in git, never overwritten by an update

@@ -28,7 +28,15 @@
    - ระบบเดาชนิด (Tomcat/WAR, Spring Boot, อื่นๆ), port ในแอป, health path (เช่น `/PatientProfileWebService/`) และหา port บนเครื่องที่ว่างให้
 3. ตรวจค่า ใส่ environment ถ้าต้องใช้ แล้วกด **บันทึกแล้วใช้เลย**
 
-ถ้าในเครื่องมี service ใน swarm ที่รันอยู่แล้ว (ไม่ได้สร้างจาก Replica Lab) จะแสดงในหน้า "เปลี่ยนแอป" กด **นำเข้า** เพื่อสร้างแอปจากค่าของ service นั้น โดย service เดิมยังรันต่อ
+### service ที่รันอยู่ใน swarm แล้ว
+service ที่สร้างเอง (`docker service create`, stack อื่น) จะแสดงในหน้า "เปลี่ยนแอป" ใต้หัวข้อ **service ที่รันอยู่ใน swarm**
+- **ควบคุมเลย** (แนะนำ): Replica Lab คุม service นั้นตรงๆ ไม่สร้างตัวใหม่ ใช้ port เดิมของมัน ปรับจำนวน replica, เริ่ม/หยุด, เปลี่ยน image, ดู log, ยิงทดสอบส่งซ้ำ/กระจายโหลดได้เหมือนแอปของ Replica Lab
+  - ครั้งแรกระบบสร้างรายการแอปให้เอง (`apps/<ชื่อ>.json` ที่มี `"attach": "<ชื่อ service>"`) ครั้งต่อไปกด **ใช้แอปนี้** ได้เลย
+  - ถ้า service ไม่มี network ของตัวเอง (มีแค่ port) ระบบต่อ network `replicalab_link` ให้ เพื่อให้หน้า Replica Lab คุยกับแต่ละ replica ได้ replica จะรีสตาร์ททีละตัวครั้งเดียว
+  - **ปิด Replica Lab แล้ว service ยังรันต่อ** ด้วยจำนวน replica ล่าสุด (เป็นของเดิม Replica Lab ไม่ลบ)
+  - เปลี่ยน port จากหน้านี้ไม่ได้ (แก้ที่ตัว service) service แบบ global ปรับ replica ไม่ได้
+  - **เลิกควบคุม** ลบแค่รายการในแอป ไม่แตะ service
+- **คัดลอกเป็นแอปใหม่:** สร้างแอปของ Replica Lab จากค่าของ service นั้น (image, port, healthcheck, env) รันเป็นอีกชุดแยกกัน ต้องใช้ port อื่น
 
 อยากให้เดาค่าแม่นขึ้น ให้ใส่ LABEL ใน Dockerfile ของแอป (ไม่บังคับ):
 ```dockerfile

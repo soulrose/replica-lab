@@ -15,6 +15,8 @@ const APP = {
   test: process.env.APP_TEST || "graphql",                // default test mode on the page: graphql | http
   buildLocal: process.env.APP_BUILD_LOCAL === "true",     // ramaservice: build-local panel
   memoryMb: Number(process.env.APP_MEMORY || 0) || null,
+  // a swarm service that was already running (not made by Replica Lab): the page controls it in place
+  attached: process.env.APP_ATTACHED === "true",
 };
 const IS_SPRING = APP.kind === "spring";
 const TARGET_PORT = Number(process.env.TARGET_PORT || 8080);
@@ -170,6 +172,7 @@ async function images() {
 // same spec (stack labels included, so `docker stack` still owns it). Replicas restart.
 let portChanging = false;
 async function setPort(port) {
+  if (APP.attached) throw new Error("service นี้ไม่ได้สร้างจาก Replica Lab เปลี่ยน port ที่ตัว service เอง (docker service update --publish-add)");
   if (portChanging) throw new Error("กำลังเปลี่ยน port อยู่");
   const services = await docker("GET", "/services");
   const svc = services.find(s => s.Spec.Name === SERVICE);
@@ -358,7 +361,8 @@ async function loadTest(count, concurrency) {
   const st = await status();
   const targets = st.replicas.filter(r => r.ip && r.state === "running");
   const before = Object.fromEntries(await Promise.all(targets.map(async r => [r.slot, await loadCount(r.ip)])));
-  const vip = SERVICE.replace(/^[^_]+_/, "");   // stack network alias, e.g. "ramaservice"
+  // our own stack: its network alias ("app"); an attached service: its full name (resolves on every network it shares with us)
+  const vip = APP.attached ? SERVICE : SERVICE.replace(/^[^_]+_/, "");
   const results = [];
   let next = 0;
   const t0 = Date.now();

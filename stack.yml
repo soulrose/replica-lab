@@ -63,6 +63,8 @@ services:
       placement: { constraints: [node.role == manager] }
       resources:
         limits: { cpus: "0.5", memory: 128M }
+      labels:
+        rama.lab.app: "${APP_NAME}"              # the app on the page now (also when it controls an attached swarm service)
 
 networks:
   net:
