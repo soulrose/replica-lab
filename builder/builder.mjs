@@ -339,9 +339,13 @@ function applyUpdate(tag) {
   j.done.then(() => {
     log(`update ${tag}: ${j.state}\n${j.lines.join("\n")}`);
     if (j.state !== "done") return;
-    spawn("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", path.join(ROOT, "restart-after-update.ps1")],
-          { cwd: ROOT, detached: true, stdio: "ignore", windowsHide: true }).unref();
-    setTimeout(() => process.exit(0), 1500);       // the page keeps polling and reloads once the new version answers
+    // a plain detached child dies with this process when the helper runs inside a Windows job (it usually does),
+    // so restart-after-update.ps1 is created through WMI (Win32_Process.Create): same user and session, outside the job
+    const cmdline = `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${path.join(ROOT, "restart-after-update.ps1")}"`;
+    const ps = `$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = '${cmdline.replace(/'/g, "''")}'; CurrentDirectory = '${ROOT.replace(/'/g, "''")}' }; exit $r.ReturnValue`;
+    const c = spawn("powershell.exe", ["-NoProfile", "-Command", ps], { stdio: "ignore", windowsHide: true });
+    const bye = code => { log(`restart-after-update started (WMI result ${code})`); setTimeout(() => process.exit(0), 1000); };
+    c.on("exit", bye); c.on("error", () => bye("error"));   // the page keeps polling and reloads once the new version answers
   });
   return view(j);
 }
