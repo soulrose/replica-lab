@@ -8,10 +8,19 @@
 
 1. ติดตั้ง **Docker Desktop** ถ้ายังไม่มี โปรแกรมจะเปิดหน้าดาวน์โหลดให้เอง
 2. ติดตั้ง **Node.js รุ่น LTS** (https://nodejs.org/en/download) ถ้ายังไม่มี โปรแกรมจะเปิดหน้าดาวน์โหลดให้เอง
-3. ดับเบิลคลิก **`ReplicaLab-Setup-x.y.z.exe`** กด **ติดตั้ง** (ค่าเริ่มต้นลงที่ `%LOCALAPPDATA%\ReplicaLab` เปลี่ยนได้ แต่ห้ามมีช่องว่างใน path) ได้ไอคอน **Replica Lab** บน Desktop แล้วโปรแกรมเปิดเอง
-   - ติดตั้งทับของเดิมได้: เก็บ `config\`, `apps\*.local.env` และโปรไฟล์แอปที่มีอยู่ไว้เหมือนการอัปเดต ถ้า Replica Lab เปิดอยู่จะถามก่อนปิดให้
-   - ติดตั้งแบบไม่มีหน้าต่าง: `ReplicaLab-Setup-x.y.z.exe /silent [/dir=C:\ReplicaLab] [/noicons] [/open]`
-   - หรือแตก zip / clone ไว้ที่ไหนก็ได้ แล้วดับเบิลคลิก **`create-shortcut.cmd`** (ย้ายโฟลเดอร์เมื่อไหร่ ให้รันอีกครั้ง)
+3. แตก **`replica-lab-team.zip`** ไว้ที่ไหนก็ได้ที่ path **ไม่มีช่องว่าง** เช่น `C:\Tools\replica-lab` (ไม่ต้องติดตั้ง เป็นแบบ portable)
+4. ในโฟลเดอร์ `replica-lab` ดับเบิลคลิก **`create-shortcut.cmd`** จะได้ไอคอน **Replica Lab** บน Desktop (ย้ายโฟลเดอร์เมื่อไหร่ ให้รันอีกครั้ง)
+   - เลิกใช้ = ลบโฟลเดอร์และไอคอนบน Desktop ได้เลย
+
+### เคยติดตั้งด้วย ReplicaLab-Setup (ตัวติดตั้งเดิม)
+เปลี่ยนมาใช้แบบ portable:
+1. ดับเบิลคลิก **`ReplicaLab-Uninstall.exe`** กด **ถอนการติดตั้ง**
+   - ถ้า Replica Lab เปิดอยู่จะถามก่อนปิดให้
+   - ติ๊ก "สำรอง..." ไว้ (ค่าเริ่มต้น) จะได้โฟลเดอร์ `ReplicaLab-backup-<วันเวลา>` บน Desktop ที่มี `apps\` (โปรไฟล์แอป, ชุดทดสอบ, ความลับ) และ `config\` (image/replica/port ที่ใช้ล่าสุด)
+   - ลบเฉพาะโฟลเดอร์ที่ตัวติดตั้งลงไว้ (ปกติ `%LOCALAPPDATA%\ReplicaLab`), ไอคอนที่ชี้ไปที่นั่น และค่าใน registry ไม่แตะ image หรือ service อื่นใน Docker และไม่แตะตัว portable ที่อยู่ที่อื่น
+   - แบบไม่มีหน้าต่าง: `ReplicaLab-Uninstall.exe /silent [/dir=C:\ReplicaLab] [/nobackup]`
+2. ทำขั้น 3-4 ด้านบน
+3. ถ้าอยากได้แอปและชุดทดสอบเดิม คัดลอก `apps` และ `config` จากโฟลเดอร์สำรองไปวางทับในโฟลเดอร์ `replica-lab` ที่แตกไว้
 
 ## ใช้งาน
 
@@ -71,9 +80,9 @@ LABEL rama.lab.kind="tomcat" rama.lab.port="8080" rama.lab.health="/PatientProfi
 2. commit, `git tag vx.y.z`, `git push` แล้ว `git push origin vx.y.z` (tag ต้อง push แยก)
 3. เครื่องทีมจะเห็นป้าย "มีเวอร์ชันใหม่" ภายใน 10 นาทีหลังเปิดโปรแกรม
 
-**ทำไฟล์ส่งให้ทีม:** `make-package.ps1` ได้ทั้ง `..\replica-lab-team.zip` และ `..\ReplicaLab-Setup-x.y.z.exe` (exe มี zip ฝังอยู่ข้างใน, build ด้วย `launcher\build-setup.cmd`)
+**ทำไฟล์ส่งให้ทีม:** `make-package.ps1` ได้ `..\replica-lab-team.zip` (ตัว portable) และ `..\ReplicaLab-Uninstall.exe` (ถอนตัวที่ติดตั้งด้วย Setup เดิม, build ด้วย `launcher\build-uninstall.cmd`) ตัวติดตั้งเดิม `ReplicaLab-Setup-x.y.z.exe` ไม่ทำแล้ว ถ้ายังต้องการใช้ `make-package.ps1 -Setup`
 
-**ความลับ:** vault token ของ ramaservice อยู่ใน `apps\ramaservice.local.env` ซึ่งไม่ขึ้น git (repo เป็นสาธารณะ) zip และ setup exe ที่ส่งให้ทีม (`make-package.ps1`) มีไฟล์นี้ อย่าเอา exe ขึ้น GitHub ถ้าติดตั้งจาก GitHub ให้ขอ token จากทีมแล้วใส่ไฟล์นี้เอง
+**ความลับ:** vault token ของ ramaservice อยู่ใน `apps\ramaservice.local.env` ซึ่งไม่ขึ้น git (repo เป็นสาธารณะ) zip ที่ส่งให้ทีม (`make-package.ps1`) มีไฟล์นี้ อย่าเอา zip ขึ้น GitHub ถ้าได้โปรแกรมจาก GitHub ให้ขอ token จากทีมแล้วใส่ไฟล์นี้เอง
 
 ## ไฟล์
 
