@@ -46,7 +46,12 @@ static class Setup
         }
         using (var zip = new ZipArchive(payload, ZipArchiveMode.Read))
         {
-            if (!silent) { Application.Run(new SetupForm(zip)); return 0; }
+            if (!silent)
+            {
+                // never die without a word: a crash shows its message instead of the exe doing "nothing"
+                try { Application.Run(new SetupForm(zip)); return 0; }
+                catch (Exception ex) { MessageBox.Show("ติดตั้งไม่ได้ เกิดข้อผิดพลาด:\n\n" + ex, Title, MessageBoxButtons.OK, MessageBoxIcon.Error); return 1; }
+            }
             try
             {
                 dir = Path.GetFullPath(dir ?? DefaultDir());
@@ -226,8 +231,8 @@ class SetupForm : Form
         cancelBtn.Text = "ยกเลิก"; cancelBtn.Size = new Size(110, 34); cancelBtn.Location = new Point(424, 282);
         installBtn.Click += (s, e) => Install();
         cancelBtn.Click += (s, e) => Close();
-        AcceptButton = installBtn; CancelButton = cancelBtn; ActiveControl = installBtn;
         Controls.AddRange(new Control[] { head, sub, dirLabel, dirBox, browseBtn, iconBox, openBox, bar, status, installBtn, cancelBtn });
+        AcceptButton = installBtn; CancelButton = cancelBtn; ActiveControl = installBtn;   // after AddRange: it must be on the form
     }
 
     void Install()
