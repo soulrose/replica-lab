@@ -1,5 +1,5 @@
 // Replica Lab Setup: one exe for the team. The program files ride inside it as an embedded zip (payload.zip, made by
-// make-package.ps1); it unpacks them into a folder, makes the Desktop / Start menu icons and opens Replica Lab.
+// make-package.ps1); it unpacks them into a folder, makes the Desktop icon and opens Replica Lab.
 // Installing over an older copy is safe: like the updater, it keeps config\ (this machine), apps\*.local.env (secrets)
 // and app profiles that already exist. Built by launcher\build-setup.cmd with the C# compiler that ships with Windows.
 using System;
@@ -223,7 +223,7 @@ class SetupForm : Form
             using (var d = new FolderBrowserDialog { Description = "เลือกโฟลเดอร์ที่จะติดตั้ง Replica Lab", SelectedPath = dirBox.Text })
                 if (d.ShowDialog(this) == DialogResult.OK) dirBox.Text = Path.Combine(d.SelectedPath, "ReplicaLab");
         };
-        iconBox.Text = "สร้างไอคอนบน Desktop และเมนู Start"; iconBox.Checked = true; iconBox.AutoSize = true; iconBox.Location = new Point(26, 176);
+        iconBox.Text = "สร้างไอคอนบน Desktop"; iconBox.Checked = true; iconBox.AutoSize = true; iconBox.Location = new Point(26, 176);
         openBox.Text = "เปิด Replica Lab เมื่อติดตั้งเสร็จ"; openBox.Checked = true; openBox.AutoSize = true; openBox.Location = new Point(26, 204);
         bar.Location = new Point(26, 240); bar.Size = new Size(508, 8); bar.Visible = false;
         status.Location = new Point(26, 252); status.Size = new Size(508, 22); status.ForeColor = Color.FromArgb(90, 90, 100);

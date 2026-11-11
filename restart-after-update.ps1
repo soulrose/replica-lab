@@ -12,6 +12,9 @@ for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep 1
 }
 & cmd /c "$PSScriptRoot\helper.cmd"
+# 1.1.2+: the icon lives on the Desktop only; an older version also put one in the Start menu
+$oldIcon = Join-Path ([Environment]::GetFolderPath("Programs")) "Replica Lab.lnk"
+if (Test-Path $oldIcon) { Remove-Item $oldIcon -Force -ErrorAction SilentlyContinue }
 Say "== helper started, redeploying the page"
 try {
     & (Join-Path $PSScriptRoot "run-local.ps1") *>&1 | ForEach-Object { Say "$_" }

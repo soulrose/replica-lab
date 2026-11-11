@@ -10,7 +10,7 @@ switch ($Kind) {
     }
     "shortcut" {
         [void][System.Windows.MessageBox]::Show(
-            "สร้างไอคอน Replica Lab บน Desktop และในเมนู Start แล้ว`n`nถ้าย้ายโฟลเดอร์โปรแกรม ให้รัน create-shortcut.cmd ใหม่",
+            "สร้างไอคอน Replica Lab บน Desktop แล้ว`n`nถ้าย้ายโฟลเดอร์โปรแกรม ให้รัน create-shortcut.cmd ใหม่",
             "Replica Lab", "OK", "Information")
     }
 }

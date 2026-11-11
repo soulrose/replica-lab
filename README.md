@@ -8,7 +8,7 @@
 
 1. ติดตั้ง **Docker Desktop** ถ้ายังไม่มี โปรแกรมจะเปิดหน้าดาวน์โหลดให้เอง
 2. ติดตั้ง **Node.js รุ่น LTS** (https://nodejs.org/en/download) ถ้ายังไม่มี โปรแกรมจะเปิดหน้าดาวน์โหลดให้เอง
-3. ดับเบิลคลิก **`ReplicaLab-Setup-x.y.z.exe`** กด **ติดตั้ง** (ค่าเริ่มต้นลงที่ `%LOCALAPPDATA%\ReplicaLab` เปลี่ยนได้ แต่ห้ามมีช่องว่างใน path) ได้ไอคอน **Replica Lab** บน Desktop และเมนู Start แล้วโปรแกรมเปิดเอง
+3. ดับเบิลคลิก **`ReplicaLab-Setup-x.y.z.exe`** กด **ติดตั้ง** (ค่าเริ่มต้นลงที่ `%LOCALAPPDATA%\ReplicaLab` เปลี่ยนได้ แต่ห้ามมีช่องว่างใน path) ได้ไอคอน **Replica Lab** บน Desktop แล้วโปรแกรมเปิดเอง
    - ติดตั้งทับของเดิมได้: เก็บ `config\`, `apps\*.local.env` และโปรไฟล์แอปที่มีอยู่ไว้เหมือนการอัปเดต ถ้า Replica Lab เปิดอยู่จะถามก่อนปิดให้
    - ติดตั้งแบบไม่มีหน้าต่าง: `ReplicaLab-Setup-x.y.z.exe /silent [/dir=C:\ReplicaLab] [/noicons] [/open]`
    - หรือแตก zip / clone ไว้ที่ไหนก็ได้ แล้วดับเบิลคลิก **`create-shortcut.cmd`** (ย้ายโฟลเดอร์เมื่อไหร่ ให้รันอีกครั้ง)
@@ -84,7 +84,7 @@ LABEL rama.lab.kind="tomcat" rama.lab.port="8080" rama.lab.health="/PatientProfi
 | `apps/<แอป>.tests.json` | ชุดทดสอบที่บันทึกไว้ของแอปนั้น |
 | `config/` | ค่าเฉพาะเครื่อง: แอปล่าสุด, image/replica/port ที่ใช้ล่าสุดของแต่ละแอป (ไม่ต้องส่งต่อ) |
 | `builder/helper.log` | log ของตัวช่วยบนเครื่อง (เปิดแอป, สลับแอป, หยุดเพราะปิดหน้าต่าง, build) |
-| `create-shortcut.cmd` | สร้างไอคอนบน Desktop และเมนู Start |
+| `create-shortcut.cmd` | สร้างไอคอนบน Desktop (ลบไอคอนเก่าในเมนู Start ถ้ามี) |
 | `start.cmd` / `stop.cmd` | เปิด / หยุด (ไอคอนเรียก start.cmd) |
 | `run-local.ps1 -App <ชื่อ>` | รันแอปจากคำสั่ง (ไม่เปิดหน้าต่าง) |
 
