@@ -8,7 +8,10 @@
 
 1. ติดตั้ง **Docker Desktop** ถ้ายังไม่มี โปรแกรมจะเปิดหน้าดาวน์โหลดให้เอง
 2. ติดตั้ง **Node.js รุ่น LTS** (https://nodejs.org/en/download) ถ้ายังไม่มี โปรแกรมจะเปิดหน้าดาวน์โหลดให้เอง
-3. แตก zip หรือ clone ไว้ที่ไหนก็ได้ แล้วดับเบิลคลิก **`create-shortcut.cmd`** จะได้ไอคอน **Replica Lab** บน Desktop และในเมนู Start (ย้ายโฟลเดอร์เมื่อไหร่ ให้รันอีกครั้ง)
+3. ดับเบิลคลิก **`ReplicaLab-Setup-x.y.z.exe`** กด **ติดตั้ง** (ค่าเริ่มต้นลงที่ `%LOCALAPPDATA%\ReplicaLab` เปลี่ยนได้ แต่ห้ามมีช่องว่างใน path) ได้ไอคอน **Replica Lab** บน Desktop และเมนู Start แล้วโปรแกรมเปิดเอง
+   - ติดตั้งทับของเดิมได้: เก็บ `config\`, `apps\*.local.env` และโปรไฟล์แอปที่มีอยู่ไว้เหมือนการอัปเดต ถ้า Replica Lab เปิดอยู่จะถามก่อนปิดให้
+   - ติดตั้งแบบไม่มีหน้าต่าง: `ReplicaLab-Setup-x.y.z.exe /silent [/dir=C:\ReplicaLab] [/noicons] [/open]`
+   - หรือแตก zip / clone ไว้ที่ไหนก็ได้ แล้วดับเบิลคลิก **`create-shortcut.cmd`** (ย้ายโฟลเดอร์เมื่อไหร่ ให้รันอีกครั้ง)
 
 ## ใช้งาน
 
@@ -60,7 +63,9 @@ LABEL rama.lab.kind="tomcat" rama.lab.port="8080" rama.lab.health="/PatientProfi
 2. commit, `git tag vx.y.z`, `git push` แล้ว `git push origin vx.y.z` (tag ต้อง push แยก)
 3. เครื่องทีมจะเห็นป้าย "มีเวอร์ชันใหม่" ภายใน 10 นาทีหลังเปิดโปรแกรม
 
-**ความลับ:** vault token ของ ramaservice อยู่ใน `apps\ramaservice.local.env` ซึ่งไม่ขึ้น git (repo เป็นสาธารณะ) zip ที่ส่งให้ทีม (`make-package.ps1`) มีไฟล์นี้ ถ้าติดตั้งจาก GitHub ให้ขอ token จากทีมแล้วใส่ไฟล์นี้เอง
+**ทำไฟล์ส่งให้ทีม:** `make-package.ps1` ได้ทั้ง `..\replica-lab-team.zip` และ `..\ReplicaLab-Setup-x.y.z.exe` (exe มี zip ฝังอยู่ข้างใน, build ด้วย `launcher\build-setup.cmd`)
+
+**ความลับ:** vault token ของ ramaservice อยู่ใน `apps\ramaservice.local.env` ซึ่งไม่ขึ้น git (repo เป็นสาธารณะ) zip และ setup exe ที่ส่งให้ทีม (`make-package.ps1`) มีไฟล์นี้ อย่าเอา exe ขึ้น GitHub ถ้าติดตั้งจาก GitHub ให้ขอ token จากทีมแล้วใส่ไฟล์นี้เอง
 
 ## ไฟล์
 

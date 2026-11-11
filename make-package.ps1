@@ -16,3 +16,10 @@ if (Test-Path $Out) { Remove-Item -Force $Out }
 Compress-Archive -Path "$tmp\replica-lab" -DestinationPath $Out
 Remove-Item -Recurse -Force $tmp
 Write-Host "package: $Out ($([math]::Round((Get-Item $Out).Length / 1KB)) KB)"
+
+# the same files as one installer exe (unpacks, makes the icons, opens Replica Lab)
+$ver = (Get-Content (Join-Path $src "VERSION") -Raw).Trim()
+$setup = Join-Path (Split-Path $Out) "ReplicaLab-Setup-$ver.exe"
+& cmd /c "`"$src\launcher\build-setup.cmd`" `"$Out`" `"$setup`""
+if ($LASTEXITCODE -eq 0 -and (Test-Path $setup)) { Write-Host "setup:   $setup ($([math]::Round((Get-Item $setup).Length / 1KB)) KB)" }
+else { Write-Host "setup exe was not built (see the compiler output above)" -ForegroundColor Yellow }
