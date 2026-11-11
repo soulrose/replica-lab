@@ -506,10 +506,10 @@ function demux(buf) {
   return Buffer.concat(out).toString("utf8");
 }
 
-function containerLogs(id, tail) {
+function containerLogs(id, tail, timestamps = false) {
   return new Promise((resolve, reject) => {
     const req = http.request({ socketPath: SOCKET, method: "GET",
-      path: `/containers/${id}/logs?stdout=1&stderr=1&tail=${tail}` }, res => {
+      path: `/containers/${id}/logs?stdout=1&stderr=1&tail=${tail}${timestamps ? "&timestamps=1" : ""}` }, res => {
       const chunks = [];
       res.on("data", c => chunks.push(c));
       res.on("end", () => {
@@ -535,6 +535,44 @@ async function replicaLogs(id, tail) {
   const text = await containerLogs(id, tail);
   return { containerId: id, slot: Number(c.Config.Labels["com.docker.swarm.task.name"]?.split(".")[1]) || null,
            task: c.Config.Labels["com.docker.swarm.task.name"], state: c.State?.Status, text };
+}
+
+// ---------- logs of every replica, merged by time ----------
+// Docker's timestamps are RFC3339Nano with the trailing zeros of the fraction cut, so pad them before comparing.
+function tsKey(ts) {
+  const m = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d+))?Z$/.exec(ts);
+  return m ? m[1] + "." + (m[2] || "").padEnd(9, "0") : ts;
+}
+
+async function allLogs(tail) {
+  const filters = encodeURIComponent(JSON.stringify({ label: [`com.docker.swarm.service.name=${SERVICE}`] }));
+  const list = await docker("GET", `/containers/json?filters=${filters}`);
+  const slotOf = c => Number(c.Labels?.["com.docker.swarm.task.name"]?.split(".")[1]) || null;
+  const per = await Promise.all(list.map(async c => {
+    const slot = slotOf(c);
+    try {
+      const text = await containerLogs(c.Id, tail, true);
+      return { slot, containerId: c.Id.slice(0, 12), state: c.State, text };
+    } catch (e) { return { slot, containerId: c.Id.slice(0, 12), state: c.State, error: e.message, text: "" }; }
+  }));
+  per.sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99));
+  const lines = [];
+  for (const p of per) {
+    let last = "";
+    p.text.split("\n").forEach((raw, i) => {
+      if (!raw) return;
+      const sp = raw.indexOf(" ");
+      const ts = sp > 0 && /^\d{4}-/.test(raw) ? raw.slice(0, sp) : "";
+      if (ts) last = tsKey(ts);
+      lines.push({ k: last, slot: p.slot, c: p.containerId, i, ts, line: ts ? raw.slice(sp + 1) : raw });
+    });
+  }
+  // by time, then by replica, then by position: a stack trace from one replica stays in one piece
+  lines.sort((a, b) => a.k < b.k ? -1 : a.k > b.k ? 1 : (a.slot ?? 99) - (b.slot ?? 99) || (a.c < b.c ? -1 : a.c > b.c ? 1 : a.i - b.i));
+  return {
+    replicas: per.map(({ text, ...r }) => r),      // during a rolling update one slot can have two containers
+    lines: lines.map(({ slot, c, ts, line }) => ({ slot, c, ts, line })),
+  };
 }
 
 // ---------- HTTP ----------
@@ -576,6 +614,17 @@ http.createServer(async (req, res) => {
     }
     if (req.method === "GET" && url.pathname === "/api/schema") {
       try { return send(res, 200, await schema(url.searchParams.get("refresh") === "1")); } catch (e) { return send(res, 503, { error: e.message }); }
+    }
+    if (req.method === "GET" && url.pathname === "/api/logs/all") {
+      const tail = Math.min(Math.max(Number(url.searchParams.get("tail")) || 300, 10), 20000);
+      try {
+        const r = await allLogs(tail);
+        if (url.searchParams.get("format") === "text") {
+          res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+          return res.end(r.lines.map(l => `[${l.slot ?? "?"}] ${l.line}`).join("\n"));
+        }
+        return send(res, 200, r);
+      } catch (e) { return send(res, 400, { error: e.message }); }
     }
     if (req.method === "GET" && url.pathname === "/api/logs") {
       const tail = Math.min(Math.max(Number(url.searchParams.get("tail")) || 300, 10), 20000);

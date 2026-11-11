@@ -287,6 +287,18 @@
             background: #17143a; border: 2px solid var(--ink); border-radius: var(--r-md); padding: 12px 14px; }
   #logBox .e { color: #ff8fa6; } #logBox .w { color: #ffd27a; }
   #logBox mark { background: rgba(255,210,63,.35); color: #fff; border-radius: 3px; }
+  /* all replicas: a colored slot tag per line + toggles to hide a replica */
+  #logBox .tag { display: inline-block; min-width: 2.6em; margin-right: 6px; padding: 0 5px; border-radius: 5px; font-weight: 700; text-align: center;
+                 color: #17143a; background: var(--sc); }
+  #logSlots { gap: 8px; }
+  .slot-t { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 2px solid var(--ink); border-radius: 999px; cursor: pointer;
+            font: 700 12.5px var(--hud); background: var(--card); user-select: none; }
+  .slot-t i { width: 10px; height: 10px; border-radius: 50%; background: var(--sc); border: 1.5px solid var(--ink); }
+  .slot-t input { position: absolute; opacity: 0; pointer-events: none; }
+  .slot-t:has(input:not(:checked)) { opacity: .45; text-decoration: line-through; }
+  .slot-t:has(input:focus-visible) { outline: 3px solid var(--violet); outline-offset: 2px; }
+  .slot-t small { font-weight: 600; color: var(--muted); }
+  .s1 { --sc: #7ee3ff; } .s2 { --sc: #ffd23f; } .s3 { --sc: #b9a6ff; } .s4 { --sc: #7ff0a8; } .s5 { --sc: #ffa3c8; } .s0 { --sc: #c9c7e6; }
 
   @media (max-width: 560px) {
     .pad, .team { padding: 16px; }
@@ -327,6 +339,7 @@
   <section class="sheet team" aria-labelledby="teamTitle">
     <div class="head">
       <h2 id="teamTitle">ทีมยูนิต<small>replica ของ service กดการ์ดเพื่อดู log</small></h2>
+      <button class="mini" id="logAllBtn" title="log ของทุก replica รวมกัน เรียงตามเวลา">ดู log ทุกตัว</button>
       <span class="run-state" id="runState"></span>
     </div>
     <div class="bays" id="bays" aria-live="polite"></div>
@@ -603,6 +616,7 @@
     <input type="text" id="logFilter" placeholder="กรองคำ เช่น ERROR, Idempotency, traceId" spellcheck="false" style="flex:1 1 200px">
     <button id="logRefresh">โหลดใหม่</button>
   </div>
+  <div class="row" id="logSlots" hidden aria-label="เลือก replica ที่จะแสดง"></div>
   <div class="row" style="gap:16px">
     <label class="check"><input type="checkbox" id="logErr"> ERROR/WARN เท่านั้น</label>
     <label class="check"><input type="checkbox" id="logAuto" checked> อัปเดตทุก 3 วินาที</label>
@@ -1565,38 +1579,78 @@ async function switchTo(name, tune, attach) {
 }
 
 // ---------- logs ----------
+// logTarget: { id, slot, task } for one replica, or { all: true } for every replica merged by time
 let logTarget = null, logTimer = null;
-document.addEventListener("click", e => {
-  const b = e.target.closest("button[data-log]");
-  if (!b || !b.dataset.log) return;
-  logTarget = { id: b.dataset.log, slot: b.dataset.slot, task: b.dataset.task };
+const hiddenSlots = new Set();            // containers switched off in the "all" view (kept while the page is open)
+const slotClass = s => "s" + (s ? ((s - 1) % 5) + 1 : 0);
+function openLog(target) {
+  logTarget = target;
   $("logCard").hidden = false; $("logScrim").hidden = false;
-  $("logTitle").textContent = `Log ของ slot ${logTarget.slot}`;
+  $("logTitle").textContent = target.all ? "Log ทุก replica" : `Log ของ slot ${target.slot}`;
+  $("logSlots").hidden = !target.all;
   $("logBox").textContent = "กำลังโหลด…";
   loadLogs(true);
   $("logClose").focus();
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("button[data-log]");
+  if (!b || !b.dataset.log) return;
+  openLog({ id: b.dataset.log, slot: b.dataset.slot, task: b.dataset.task });
 });
+$("logAllBtn").onclick = () => openLog({ all: true });
+$("logSlots").onchange = e => {
+  const s = e.target.dataset.c;
+  if (!s) return;
+  e.target.checked ? hiddenSlots.delete(s) : hiddenSlots.add(s);
+  loadLogs(false);
+};
+function renderSlots(replicas, counts) {
+  const box = $("logSlots");
+  const key = replicas.map(r => `${r.containerId}:${counts[r.containerId] || 0}:${hiddenSlots.has(r.containerId)}`).join(",");
+  if (box.dataset.key === key) return;          // keep focus on a toggle while the view refreshes
+  box.dataset.key = key;
+  const twice = s => replicas.filter(r => r.slot === s).length > 1;     // rolling update: old + new container in one slot
+  box.innerHTML = `<span class="small" style="font-weight:600">แสดง:</span>` + replicas.map(r =>
+    `<label class="slot-t ${slotClass(r.slot)}" title="container ${esc(r.containerId)} (${esc(r.state)})${r.error ? " อ่าน log ไม่ได้: " + esc(r.error) : ""}">
+       <input type="checkbox" data-c="${esc(r.containerId)}" ${hiddenSlots.has(r.containerId) ? "" : "checked"}><i></i>slot ${r.slot ?? "?"}${twice(r.slot) ? " · " + esc(r.containerId.slice(0, 6)) : ""}
+       <small>${r.error ? "อ่านไม่ได้" : (counts[r.containerId] || 0) + " บรรทัด"}</small></label>`).join("")
+    + (replicas.length ? "" : `<span class="small">ไม่มี replica ที่รันอยู่</span>`);
+}
 async function loadLogs(toBottom) {
   if (!logTarget) return;
+  const target = logTarget;
   const tail = $("logTail").value;
-  $("logOpen").href = `/api/logs?container=${logTarget.id}&tail=${tail}&format=text`;
+  const api = target.all ? `/api/logs/all?tail=${tail}` : `/api/logs?container=${target.id}&tail=${tail}`;
+  $("logOpen").href = api + "&format=text";
   try {
-    const r = await fetch(`/api/logs?container=${logTarget.id}&tail=${tail}`);
+    const r = await fetch(api);
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || r.status);
+    if (logTarget !== target) return;           // closed or switched while loading
     const box = $("logBox");
     const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
     const f = $("logFilter").value.trim().toLowerCase();
-    let lines = j.text.split("\n");
-    if ($("logErr").checked) lines = lines.filter(l => / (ERROR|WARN) |Exception|^\s+at /.test(l));
-    if (f) lines = lines.filter(l => l.toLowerCase().includes(f));
+    let rows = target.all ? j.lines : j.text.split("\n").map(line => ({ line }));
+    if (target.all) {
+      const counts = {};
+      for (const x of rows) counts[x.c] = (counts[x.c] || 0) + 1;
+      renderSlots(j.replicas, counts);
+      rows = rows.filter(x => !hiddenSlots.has(x.c));
+    }
+    if ($("logErr").checked) rows = rows.filter(x => / (ERROR|WARN) |Exception|^\s+at /.test(x.line));
+    if (f) rows = rows.filter(x => x.line.toLowerCase().includes(f));
     const fe = esc(f).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    box.innerHTML = lines.map(l => {
+    box.innerHTML = rows.map(x => {
+      const l = x.line;
       let h = esc(l);
       if (f) h = h.replace(new RegExp(fe, "gi"), m => `<mark>${m}</mark>`);
-      return / ERROR |Exception/.test(l) ? `<span class="e">${h}</span>` : / WARN /.test(l) ? `<span class="w">${h}</span>` : h;
+      h = / ERROR |Exception/.test(l) ? `<span class="e">${h}</span>` : / WARN /.test(l) ? `<span class="w">${h}</span>` : h;
+      return target.all ? `<span class="tag ${slotClass(x.slot)}" title="${esc(x.ts || "")}">${x.slot ?? "?"}</span>${h}` : h;
     }).join("\n");
-    $("logInfo").textContent = `task ${logTarget.task}, container ${j.containerId} (${j.state}) แสดง ${lines.length} บรรทัด อัปเดต ${new Date().toLocaleTimeString("th-TH")}`;
+    const now = new Date().toLocaleTimeString("th-TH");
+    $("logInfo").textContent = target.all
+      ? `${j.replicas.length} replica, ${tail} บรรทัดล่าสุดต่อตัว เรียงตามเวลา แสดง ${rows.length} บรรทัด อัปเดต ${now}`
+      : `task ${target.task}, container ${j.containerId} (${j.state}) แสดง ${rows.length} บรรทัด อัปเดต ${now}`;
     if (toBottom || atBottom) box.scrollTop = box.scrollHeight;
   } catch (e) { $("logInfo").textContent = "โหลด log ไม่ได้: " + e.message; }
 }
