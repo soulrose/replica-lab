@@ -319,9 +319,7 @@ async function about() {
     const m = text.match(/^## [\s\S]*?(?=^## |(?![\s\S]))/m);
     changelog = m ? m[0].trim() : "";
   } catch { /* no changelog */ }
-  let repo = "";
-  try { repo = JSON.parse(fs.readFileSync(path.join(ROOT, "update.json"), "utf8")).repo; } catch { /* none */ }
-  return { version: readVersion(), changelog, node: process.version, docker: docker.ok ? docker.out.trim() : null, repo, folder: ROOT,
+  return { version: readVersion(), changelog, node: process.version, docker: docker.ok ? docker.out.trim() : null, folder: ROOT,
            tokenSet: fs.existsSync(path.join(ROOT, "config", "github-token.txt")) };
 }
 function saveToken(token) {

@@ -22,7 +22,7 @@ function Out-Json($o) { [Console]::OutputEncoding = [Text.Encoding]::UTF8; $o | 
 if ($Check) {
     try {
         $tags = @(Get-Api "tags?per_page=100") | Where-Object { Get-Ver $_.name }
-        if (-not $tags) { Out-Json @{ current = $current; latest = $null; newer = $false; repo = $repo; error = "ยังไม่มี tag เวอร์ชันใน repo" }; exit 0 }
+        if (-not $tags) { Out-Json @{ current = $current; latest = $null; newer = $false; error = "ยังไม่มี tag เวอร์ชันใน repo" }; exit 0 }
         $latest = ($tags | Sort-Object { Get-Ver $_.name } -Descending | Select-Object -First 1).name
         $newer = (Get-Ver $latest) -gt (Get-Ver $current)
         $notes = ""
@@ -35,11 +35,11 @@ if ($Check) {
                 $notes = if ($m.Success) { $m.Value.Trim() } else { "" }
             } catch { }
         }
-        Out-Json @{ current = $current; latest = $latest.TrimStart("v"); tag = $latest; newer = $newer; notes = $notes; repo = $repo }
+        Out-Json @{ current = $current; latest = $latest.TrimStart("v"); tag = $latest; newer = $newer; notes = $notes }
     } catch {
         $code = $_.Exception.Response.StatusCode.value__
-        $msg = if ($code -eq 404 -or $code -eq 401) { "เข้า repo $repo ไม่ได้ (repo ส่วนตัว: ใส่ GitHub token ที่หน้า About)" } else { "เช็คอัปเดตไม่ได้: $($_.Exception.Message)" }
-        Out-Json @{ current = $current; latest = $null; newer = $false; repo = $repo; error = $msg }
+        $msg = if ($code -eq 404 -or $code -eq 401) { "เข้า repo บน GitHub ไม่ได้ (ถ้าเป็น repo ส่วนตัว ใส่ GitHub token ที่หน้า About)" } else { "เช็คอัปเดตไม่ได้: $($_.Exception.Message)" }
+        Out-Json @{ current = $current; latest = $null; newer = $false; error = $msg }
     }
     exit 0
 }
@@ -51,7 +51,7 @@ if ($Apply) {
     if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp }
     New-Item -ItemType Directory $tmp | Out-Null
     $zip = Join-Path $tmp "update.zip"
-    Write-Host "downloading $repo $tag"
+    Write-Host "downloading $tag"
     Invoke-WebRequest -Uri "https://api.github.com/repos/$repo/zipball/$tag" -Headers $headers -OutFile $zip -UseBasicParsing
     Write-Host "unpacking"
     Expand-Archive -Path $zip -DestinationPath (Join-Path $tmp "x")

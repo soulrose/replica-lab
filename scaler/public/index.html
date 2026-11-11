@@ -501,11 +501,11 @@
   <div class="head"><h2 id="aboutTitle">เกี่ยวกับ Replica Lab</h2><button class="quiet" id="aboutClose">ปิด</button></div>
   <p class="hint" style="margin:0 0 12px">รันแอปจาก image ในเครื่องเป็นหลาย replica บน Docker Swarm ปรับจำนวนขึ้นลง ดู log ทีละตัว และทดสอบส่งซ้ำข้าม replica</p>
   <dl class="sel">
+    <dt>ผู้พัฒนา</dt><dd>DevTeam, Information Technology<br>Faculty of Medicine Ramathibodi Hospital, Mahidol University</dd>
     <dt>เวอร์ชัน</dt><dd id="aVersion">–</dd>
     <dt>Docker</dt><dd id="aDocker">–</dd>
     <dt>Node.js</dt><dd id="aNode">–</dd>
     <dt>โฟลเดอร์โปรแกรม</dt><dd id="aFolder" class="mono">–</dd>
-    <dt>แหล่งอัปเดต</dt><dd id="aRepo">–</dd>
   </dl>
   <div class="divider"></div>
   <h2 style="font-size:16px">อัปเดต</h2>
@@ -1178,7 +1178,6 @@ async function loadAbout() {
     const a = await builder("GET", "/about");
     $("aVersion").textContent = a.version; $("aDocker").textContent = a.docker || "อ่านไม่ได้"; $("aNode").textContent = a.node;
     $("aFolder").textContent = a.folder;
-    $("aRepo").innerHTML = a.repo ? `<a href="https://github.com/${esc(a.repo)}" target="_blank">github.com/${esc(a.repo)}</a>` : "–";
     $("aChangelog").textContent = a.changelog || "–";
     $("uTokenInfo").textContent = (a.tokenSet ? "มี token แล้ว " : "") + "เก็บไว้ที่ config\\github-token.txt ของเครื่องนี้เท่านั้น ไม่ขึ้น git";
   } catch (e) { $("aChangelog").textContent = "อ่านข้อมูลไม่ได้: " + e.message + " (ต้องเปิดผ่าน Replica Lab.exe ให้ตัวช่วยทำงาน)"; }
