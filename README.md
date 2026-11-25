@@ -120,3 +120,6 @@ LABEL rama.lab.kind="tomcat" rama.lab.port="8080" rama.lab.health="/PatientProfi
 - ใช้ได้บนเครื่องเดียว (single-node swarm) image ที่ build ในเครื่องใช้ได้ทันทีโดยไม่ต้อง push
 - container ใช้ DNS ของโรงพยาบาล (10.6.22.16, 10.6.22.15) เพื่อหาชื่อเครื่องภายในได้
 - แอปเก่าที่เก็บ session ในหน่วยความจำ ถ้า request ไปตก replica อื่น login จะหลุด เพราะ Swarm กระจายตาม connection ไม่ติดตาม cookie
+
+## สัญญาอนุญาต
+ซอร์สโค้ดเผยแพร่ภายใต้ MIT License ดูไฟล์ [LICENSE](LICENSE) โปรแกรมให้ใช้ตามสภาพ ไม่มีการรับประกัน
