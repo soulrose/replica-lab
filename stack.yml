@@ -10,7 +10,6 @@ services:
     env_file:
       - ${APP_ENV_FILE}                          # apps\<name>.env (in git; ramaservice: Spring settings)
       - ${APP_LOCAL_ENV_FILE}                    # apps\<name>.local.env (this machine only: tokens/passwords, not in git)
-    dns: ["${RS_DNS1:-10.6.22.16}", "${RS_DNS2:-10.6.22.15}"]   # hospital DNS: Docker Desktop cannot resolve internal hosts by itself
     ports:
       - target: ${APP_PORT}
         published: ${APP_HOST_PORT}
@@ -48,6 +47,8 @@ services:
       APP_TEST: "${APP_TEST}"
       APP_BUILD_LOCAL: "${APP_BUILD_LOCAL}"
       APP_MEMORY: "${APP_MEMORY}"
+      PAGE_KEY: "${PAGE_KEY}"                    # config\page-key.txt: the page's API answers only with this key
+      HARBOR_HOST: "${HARBOR_HOST}"              # registry of this site (empty = Docker Hub)
       RL_VERSION: "${RL_VERSION:-dev}"           # Replica Lab version (VERSION file), shown on the page
       SCALER_MAX: ${SCALER_MAX:-5}
     ports:

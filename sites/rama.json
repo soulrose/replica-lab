@@ -1,0 +1,1 @@
+{ "name": "rama", "dns": ["10.6.22.16", "10.6.22.15"], "harbor": "harbor.rama.mahidol.ac.th", "nodeImage": "harbor.rama.mahidol.ac.th/library/node-alpine:lts-alpine3.24" }

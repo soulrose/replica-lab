@@ -24,6 +24,9 @@ const LAST_REPO = path.join(ROOT, "config", "last-repo.txt");
 const ALLOWED = new Set([`http://localhost:${APP_PORT}`, `http://127.0.0.1:${APP_PORT}`, `http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`]);
 const MAX_LINES = 3000;
 const log = (...a) => console.log(new Date().toISOString(), ...a);
+// Docker installed while the helper runs: its folder is not on the PATH the helper started with
+process.env.PATH = `${process.env.PATH};${process.env.ProgramFiles || "C:\\Program Files"}\\Docker\\Docker\\resources\\bin`;
+const HOSTS = new Set([`localhost:${PORT}`, `127.0.0.1:${PORT}`]);      // any other Host = DNS rebinding
 
 // ---------- run a PowerShell script, keep its output ----------
 function runPs(script, args) {
@@ -74,6 +77,34 @@ function switchApp(name, tune) {
   if (!fs.existsSync(path.join(APPS, `${name}.json`))) throw new Error("ไม่มีแอป " + name);
   launch = runPs(RUN_SCRIPT, ["-App", name, ...(tune ? ["-TuneRam"] : [])]);
   return view(launch);
+}
+
+// ---------- page key, sample app, Docker install ----------
+const pageKey = () => { try { return fs.readFileSync(path.join(ROOT, "config", "page-key.txt"), "utf8").trim(); } catch { return ""; } };
+const siteInfo = () => {
+  let name = "default"; try { name = fs.readFileSync(path.join(ROOT, "config", "site.txt"), "utf8").trim(); } catch { /* before the first run */ }
+  return readJsonFile(path.join(ROOT, "sites", path.basename(name) + ".json"), { nodeImage: "node:lts-alpine" });
+};
+// samples\hello as the app "hello": built here from the base image of this site, with a saved duplicate test that is
+// meant to fail (it keeps its idempotency keys in memory, per replica)
+async function makeSample() {
+  const name = "hello", image = "replica-lab-hello:local", file = path.join(APPS, name + ".json");
+  const b = await run("docker", ["build", "-q", "--build-arg", "BASE=" + siteInfo().nodeImage, "-t", image, path.join(ROOT, "samples", "hello")], 600000);
+  if (!b.ok) throw new Error("สร้าง image ตัวอย่างไม่ได้: " + (b.err.trim().split(/\r?\n/).pop() || "docker build ไม่สำเร็จ"));
+  if (!fs.existsSync(file)) {
+    const profile = { name, title: "hello (ตัวอย่าง)", image, kind: "http", port: 8080, hostPort: await freeHostPort(), health: "/health", startPeriod: 10,
+                      memoryMb: 256, memoryAuto: false, test: "http", buildLocal: false, note: "แอปตัวอย่างของ Replica Lab" };
+    fs.writeFileSync(path.join(APPS, name + ".env"), "# environment for hello (KEY=value per line)\n");
+    saveTest(name, { name: "สั่งซื้อซ้ำข้าม replica (ตั้งใจให้ไม่ผ่าน)", mode: "http", method: "POST", path: "/orders", headers: {}, body: "{}", idPath: "id", copies: 6, keyMode: "same", delayMs: 0 });
+    fs.writeFileSync(file, JSON.stringify(profile, null, 2) + "\n");
+  }
+  return { app: name };
+}
+// Docker Desktop through winget in its own window: the person reads and accepts the terms there
+async function installDocker() {
+  if (!(await run("where", ["winget"])).ok) return { started: false };
+  spawn("cmd.exe", ["/c", "start", "Docker Desktop", "cmd", "/k", "winget install -e --id Docker.DockerDesktop"], { detached: true, stdio: "ignore" }).unref();
+  return { started: true };
 }
 
 // ---------- vault token of an app that reads its settings from Vault (ramaservice) ----------
@@ -632,6 +663,7 @@ http.createServer(async (req, res) => {
   const origin = req.headers.origin || "";
   const url = new URL(req.url, "http://x");
   try {
+    if (!HOSTS.has(req.headers.host || "")) return send(res, "", 403, { error: "forbidden" });
     // the launch page itself: opened directly by start.cmd as the app window
     if (req.method === "GET" && (url.pathname === "/launch" || url.pathname === "/")) {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
@@ -653,6 +685,9 @@ http.createServer(async (req, res) => {
     // everything else: only the Replica Lab pages (they send this header; a plain cross-site form cannot)
     if (!fromLab(req) || req.headers["x-replica-lab"] !== "1") return send(res, origin, 403, { error: "forbidden" });
     if (req.method === "GET" && url.pathname === "/health") return send(res, origin, 200, { ok: true, building: job?.state === "running", pages: pages.size });
+    if (req.method === "GET" && url.pathname === "/page-key") return send(res, origin, 200, { key: pageKey() });
+    if (req.method === "POST" && url.pathname === "/sample") return send(res, origin, 200, await makeSample());
+    if (req.method === "POST" && url.pathname === "/docker/install") return send(res, origin, 202, await installDocker());
     if (req.method === "GET" && url.pathname === "/launch/status") return send(res, origin, 200, await launchStatus());
     if (req.method === "POST" && url.pathname === "/launch/start") return send(res, origin, 202, await startLaunch());
     if (req.method === "GET" && url.pathname === "/apps") return send(res, origin, 200, await listApps());

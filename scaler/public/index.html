@@ -351,7 +351,8 @@
       <li>หรือ <b>ควบคุม service</b> ที่รันอยู่ใน swarm แล้ว</li>
     </ul>
     <p class="small">ค่าทั่วไปใส่ในช่อง environment ของแอป ส่วนค่าที่เป็นความลับ (token, รหัสผ่าน) ใส่ในไฟล์ <code>apps\&lt;แอป&gt;.local.env</code> ในเครื่องนี้ (สร้างให้เองตอนรันแอปครั้งแรก การอัปเดตไม่แตะไฟล์นี้)</p>
-    <button class="primary" id="noAppBtn">เพิ่มแอปแรก</button>
+    <div class="row"><button class="primary" id="noAppBtn">เพิ่มแอปแรก</button> <button id="sampleBtn">ลองแอปตัวอย่าง</button></div>
+    <div class="msg" id="sampleMsg" aria-live="polite"></div>
   </section>
 
   <!-- the team -->
@@ -404,7 +405,7 @@
       <pre id="bLog" hidden></pre>
       </div>
       <div class="divider"></div>
-      <label class="field"><span>เรียกรุ่นใหม่จาก Harbor (project/repo:tag)</span>
+      <label class="field"><span id="pullLabel">เรียกรุ่นใหม่จาก Harbor (project/repo:tag)</span>
         <input type="text" id="pullRef" spellcheck="false" placeholder="newhis/ramaservice:775-feature-…" title="ใส่หรือไม่ใส่ harbor.rama.mahidol.ac.th/ ก็ได้">
       </label>
       <div class="row" style="margin-top:10px">
@@ -658,6 +659,30 @@
 </aside>
 
 <script>
+// Every call to this page's API carries the key of this PC, read from the helper on 127.0.0.1 (see "access" in server.mjs).
+const pageKey = { value: "", asked: 0 };
+try { pageKey.value = localStorage.getItem("rlKey") || ""; } catch { /* no storage */ }
+async function askPageKey() {
+  if (Date.now() - pageKey.asked < 2000) return false;
+  pageKey.asked = Date.now();
+  try {
+    const r = await rawFetch(`http://${location.hostname}:18091/page-key`, { headers: { "X-Replica-Lab": "1" } });
+    const k = (await r.json()).key || "";
+    if (!k) return false;
+    pageKey.value = k;
+    try { localStorage.setItem("rlKey", k); } catch { /* no storage */ }
+    return true;
+  } catch { return false; }
+}
+const rawFetch = window.fetch.bind(window);
+window.fetch = async (url, opts = {}) => {
+  if (typeof url !== "string" || !url.startsWith("/api/")) return rawFetch(url, opts);
+  if (!pageKey.value) await askPageKey();
+  const call = () => rawFetch(url, { ...opts, headers: { ...(opts.headers || {}), "X-Replica-Key": pageKey.value } });
+  const r = await call();
+  const locked = r.status === 401 || (url === "/api/status" && r.ok && (await r.clone().json().catch(() => ({}))).locked);
+  return locked && await askPageKey() ? call() : r;
+};
 const $ = id => document.getElementById(id);
 let max = 5, desired = null, busy = false, dirty = false, lastStatus = null;
 
@@ -770,6 +795,10 @@ async function refresh() {
     const r = await fetch("/api/status");
     const st = await r.json();
     if (!r.ok) throw new Error(st.error || r.status);
+    if (st.locked) throw new Error("เปิดหน้านี้จากไอคอน Replica Lab บนเครื่องที่รันเท่านั้น");
+    $("pullLabel").textContent = st.harbor ? "เรียกรุ่นใหม่จาก Harbor (project/repo:tag)" : "เรียก image จาก Docker Hub (repo:tag)";
+    $("pullRef").placeholder = st.harbor ? "project/repo:tag" : "nginx:alpine";
+    $("pullRef").title = st.harbor ? `ใส่หรือไม่ใส่ ${st.harbor}/ ก็ได้` : "ใส่ชื่อเต็มของ registry อื่นได้ เช่น ghcr.io/owner/repo:tag";
     max = st.max; desired = st.desired; lastStatus = st;
     if (st.version) $("verTag").textContent = "v" + st.version;
     document.body.classList.toggle("no-app", !!st.noApp);
@@ -1435,6 +1464,22 @@ $("swarmList").addEventListener("click", async e => {
 function closeApps() { $("appCard").hidden = true; $("appScrim").hidden = true; }
 $("appBtn").onclick = openApps;
 $("noAppBtn").onclick = openApps;
+$("sampleBtn").onclick = async () => {
+  const m = $("sampleMsg"); m.className = "msg"; m.textContent = "กำลังสร้าง image ตัวอย่าง…"; $("sampleBtn").disabled = true;
+  try { const { app } = await builder("POST", "/sample"); m.textContent = ""; await switchTo(app, false); }
+  catch (e) { m.className = "msg err"; m.textContent = e.message; }
+  finally { $("sampleBtn").disabled = false; }
+};
+// a plain link cannot carry the key: fetch the text, then show it in a new tab
+$("logOpen").addEventListener("click", async e => {
+  e.preventDefault();
+  const tab = window.open("", "_blank");
+  try {
+    const r = await fetch($("logOpen").getAttribute("href"));
+    const u = URL.createObjectURL(new Blob([await r.text()], { type: "text/plain;charset=utf-8" }));
+    if (tab) tab.location = u;
+  } catch (err) { tab?.close(); $("logInfo").textContent = "เปิด log ไม่ได้: " + err.message; }
+});
 $("appClose").onclick = closeApps;
 $("appScrim").onclick = closeApps;
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("appCard").hidden) closeApps(); });

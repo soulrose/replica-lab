@@ -4,6 +4,7 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const SERVICE = process.env.TARGET_SERVICE || "replicalab_app";
@@ -96,17 +97,17 @@ async function start() {
 }
 
 // ---------- pull from Harbor (any project/repo/tag), in the background ----------
-const HARBOR = process.env.HARBOR_HOST || "harbor.rama.mahidol.ac.th";
+const HARBOR = process.env.HARBOR_HOST || "";      // registry of this site (sites\<name>.json); empty = Docker Hub or a full name
 const pulledImages = new Set();          // shown in the image list even when the repo is not "ramaservice"
 let pullJob = null;                      // { image, state: pulling|done|error, message, layers, layersDone, apply, startedAt }
 
 function normalizeRef(input) {
   let ref = String(input || "").trim();
   if (!ref) throw new Error("ใส่ชื่อ image");
-  if (!ref.startsWith(HARBOR + "/")) ref = HARBOR + "/" + ref.replace(/^\/+/, "");
+  if (HARBOR && !ref.startsWith(HARBOR + "/")) ref = HARBOR + "/" + ref.replace(/^\/+/, "");
   const last = ref.slice(ref.lastIndexOf("/") + 1);
   if (!last.includes(":")) ref += ":latest";
-  if (!/^[a-z0-9.-]+\/[a-z0-9._/-]+:[A-Za-z0-9._-]{1,128}$/.test(ref)) throw new Error("ชื่อ image ไม่ถูกต้อง: " + ref);
+  if (!/^[a-z0-9][a-z0-9.-]*(:\d+)?(\/[a-z0-9._-]+)*:[A-Za-z0-9._-]{1,128}$/.test(ref)) throw new Error("ชื่อ image ไม่ถูกต้อง: " + ref);
   return ref;
 }
 
@@ -305,7 +306,7 @@ async function nodeMemory() {
 
 async function status() {
   if (NO_APP) {
-    return { noApp: true, service: null, app: null, version: process.env.RL_VERSION || "dev", image: "", desired: 0, healthy: 0,
+    return { noApp: true, harbor: HARBOR, service: null, app: null, version: process.env.RL_VERSION || "dev", image: "", desired: 0, healthy: 0,
              max: MAX, lastReplicas: null, updateStatus: null, nodeMemMb: await nodeMemory(), unitLimitMb: null,
              publishedPorts: [], replicas: [], recent: [], now: new Date().toISOString() };
   }
@@ -334,7 +335,7 @@ async function status() {
 
   const healthy = replicas.filter(r => r.state === "running" && (r.container?.health ?? "healthy") === "healthy").length;
   return {
-    service: SERVICE, app: APP, version: process.env.RL_VERSION || "dev", image: spec.TaskTemplate.ContainerSpec.Image.split("@")[0], desired, healthy,
+    service: SERVICE, app: APP, harbor: HARBOR, version: process.env.RL_VERSION || "dev", image: spec.TaskTemplate.ContainerSpec.Image.split("@")[0], desired, healthy,
     max: MAX, lastReplicas: Number(spec.Labels?.[LAST_LABEL]) || null, updateStatus: svc.UpdateStatus || null,
     nodeMemMb: await nodeMemory(),
     unitLimitMb: spec.TaskTemplate.Resources?.Limits?.MemoryBytes ? Math.round(spec.TaskTemplate.Resources.Limits.MemoryBytes / 1048576) : null,
@@ -582,6 +583,14 @@ async function allLogs(tail) {
   };
 }
 
+// ---------- access ----------
+// This page can do anything with Docker on this PC, so its API wants the key of config\page-key.txt. The page reads it
+// from the helper on 127.0.0.1, so it works from this PC only. A header, not a cookie: cookies of localhost would also
+// go to the app under test, and a header cannot be sent by another site.
+const PAGE_KEY = process.env.PAGE_KEY || "";
+const digest = s => createHash("sha256").update(String(s)).digest();
+const allowed = req => !!PAGE_KEY && timingSafeEqual(digest(req.headers["x-replica-key"] || ""), digest(PAGE_KEY));
+
 // ---------- HTTP ----------
 function send(res, code, obj) {
   const body = Buffer.from(JSON.stringify(obj));
@@ -603,6 +612,12 @@ http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/") {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       return res.end(INDEX);
+    }
+    if (!allowed(req)) {
+      // version and app name only: a page that was open before an update (1.4 and older, no key) waits for these
+      if (req.method === "GET" && url.pathname === "/api/status")
+        return send(res, 200, { locked: true, version: process.env.RL_VERSION || "dev", app: NO_APP ? null : { name: APP.name } });
+      return send(res, 401, { error: "เปิดหน้านี้จากไอคอน Replica Lab บนเครื่องที่รันเท่านั้น" });
     }
     if (req.method === "GET" && url.pathname === "/api/status") return send(res, 200, await status());
     // no app yet: everything that needs the app service waits for the first app (added through the helper)

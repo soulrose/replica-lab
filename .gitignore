@@ -2,6 +2,9 @@ config/
 builder/*.log
 # app profiles, their environment and secrets belong to each machine: a fresh copy has none
 apps/*
+# Node.js of the full package and the site of the team package
+node/
+site.txt
 !apps/.gitkeep
 # notes for the maintainer, not part of the program
 docs/

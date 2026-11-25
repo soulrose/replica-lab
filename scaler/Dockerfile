@@ -1,5 +1,6 @@
-# Same base image as other OffLab tools; already in Harbor, so no Docker Hub pull is needed.
-FROM harbor.rama.mahidol.ac.th/library/node-alpine:lts-alpine3.24
+# run-local.ps1 passes the base image of this PC's site (sites\<name>.json): Docker Hub by default, Harbor in the hospital.
+ARG BASE=node:lts-alpine
+FROM ${BASE}
 WORKDIR /app
 COPY server.mjs ./
 COPY public ./public

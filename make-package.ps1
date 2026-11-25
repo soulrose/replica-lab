@@ -3,6 +3,8 @@
 #     replica-lab-team.zip, ReplicaLab-Setup-<ver>-team.exe
 #   bare (the program only, no app, no token; fine to publish, users add their own apps):
 #     replica-lab-<ver>.zip, ReplicaLab-Setup-<ver>.exe
+#   full (bare + Node.js inside, so the other PC needs Docker Desktop only; for friends outside the team):
+#     replica-lab-<ver>-full.zip, ReplicaLab-Setup-<ver>-full.exe
 #   ReplicaLab-Uninstall.exe (removes a copy a Setup installed)
 #   .\make-package.ps1 -ExcludeApps tomcat-demo     # leave some apps out of the team package
 param([string]$OutDir = (Split-Path $PSScriptRoot), [string[]]$ExcludeApps = @())
@@ -11,20 +13,26 @@ $src = $PSScriptRoot
 $ver = (Get-Content (Join-Path $src "VERSION") -Raw).Trim()
 $kb = { param($f) "$([math]::Round((Get-Item $f).Length / 1KB)) KB" }
 
-function New-Package([string]$zip, [bool]$withApps) {
+function New-Package([string]$zip, [bool]$withApps, [bool]$withNode = $false) {
     $tmp = Join-Path $env:TEMP "replica-lab-package"
     if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp }
     New-Item -ItemType Directory "$tmp\replica-lab" | Out-Null
     # never: this machine's state, git, maintainer notes
-    Get-ChildItem $src -Force | Where-Object { $_.Name -notin @("config", ".git", "docs") } | ForEach-Object {
+    Get-ChildItem $src -Force | Where-Object { $_.Name -notin @("config", ".git", "docs", "node", "site.txt") } | ForEach-Object {
         Copy-Item $_.FullName "$tmp\replica-lab" -Recurse -Force
     }
     Get-ChildItem "$tmp\replica-lab\builder" -Filter *.log -ErrorAction SilentlyContinue | Remove-Item -Force
     $apps = "$tmp\replica-lab\apps"
     New-Item -ItemType Directory -Force $apps | Out-Null
-    if ($withApps) { foreach ($a in $ExcludeApps) { Get-ChildItem $apps -Filter "$a.*" | Remove-Item -Force } }
+    if ($withApps) {
+        # the team's PCs get this PC's site (DNS, registry) even on their first run outside the hospital network
+        $siteFile = Join-Path $src "config\site.txt"
+        [IO.File]::WriteAllText("$tmp\replica-lab\site.txt", $(if (Test-Path $siteFile) { "$(Get-Content $siteFile -Raw)".Trim() } else { "rama" }))
+        foreach ($a in $ExcludeApps) { Get-ChildItem $apps -Filter "$a.*" | Remove-Item -Force }
+    }
     else { Get-ChildItem $apps -Force | Where-Object { $_.Name -ne ".gitkeep" } | Remove-Item -Force }
     if (-not (Test-Path "$apps\.gitkeep")) { New-Item -ItemType File "$apps\.gitkeep" | Out-Null }   # keep the empty folder in the zip
+    if ($withNode) { Add-Node "$tmp\replica-lab\node" }
     if (Test-Path $zip) { Remove-Item -Force $zip }
     Compress-Archive -Path "$tmp\replica-lab" -DestinationPath $zip
     Remove-Item -Recurse -Force $tmp
@@ -33,10 +41,22 @@ function New-Package([string]$zip, [bool]$withApps) {
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         $z = [IO.Compression.ZipFile]::OpenRead($zip)
         # PowerShell 5.1 writes the entry names with backslashes
-        $bad = @($z.Entries | Where-Object { $_.FullName -match '(^|[\\/])apps[\\/].+' -and $_.Name -ne ".gitkeep" -or $_.FullName -match '\.local\.env$|(^|[\\/])config[\\/]' })
+        $bad = @($z.Entries | Where-Object { $_.FullName -match '(^|[\\/])apps[\\/].+' -and $_.Name -ne ".gitkeep" -or $_.FullName -match '\.local\.env$|(^|[\\/])config[\\/]|[\\/]site\.txt$' })
         $z.Dispose()
         if ($bad) { Remove-Item -Force $zip; throw "bare package has app files: $($bad.FullName -join ', ')" }
     }
+}
+
+# the Node.js of this PC (official build only: signed by the OpenJS Foundation) with its licence
+function Add-Node([string]$dest) {
+    $exe = & node -p "require('fs').realpathSync(process.execPath)"
+    $sig = Get-AuthenticodeSignature $exe
+    if ($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notmatch "OpenJS Foundation") { throw "node.exe is not an official signed build: $exe" }
+    $lic = Join-Path (Split-Path $exe) "LICENSE"
+    if (-not (Test-Path $lic)) { throw "no Node.js LICENSE next to $exe" }
+    New-Item -ItemType Directory -Force $dest | Out-Null
+    Copy-Item $exe (Join-Path $dest "node.exe")
+    Copy-Item $lic (Join-Path $dest "LICENSE")
 }
 
 function New-Setup([string]$zip, [string]$exe) {
@@ -56,6 +76,12 @@ $bareZip = Join-Path $OutDir "replica-lab-$ver.zip"
 New-Package $bareZip $false
 Write-Host "  zip:    $bareZip ($(& $kb $bareZip))"
 New-Setup $bareZip (Join-Path $OutDir "ReplicaLab-Setup-$ver.exe")
+
+Write-Host "full (bare + Node.js, the other PC needs Docker Desktop only):"
+$fullZip = Join-Path $OutDir "replica-lab-$ver-full.zip"
+New-Package $fullZip $false $true
+Write-Host "  zip:    $fullZip ($(& $kb $fullZip))"
+New-Setup $fullZip (Join-Path $OutDir "ReplicaLab-Setup-$ver-full.exe")
 
 $uninst = Join-Path $OutDir "ReplicaLab-Uninstall.exe"
 & cmd /c "`"$src\launcher\build-uninstall.cmd`" `"$uninst`""

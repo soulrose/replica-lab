@@ -141,6 +141,13 @@ static class Setup
         return "";
     }
 
+    public static bool HasNode(ZipArchive zip)
+    {
+        foreach (var e in zip.Entries)
+            if (Rel(e).Equals("node\\node.exe", StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
     public static bool HelperRunning()
     {
         try { using (var c = new TcpClient()) { c.Connect("127.0.0.1", 18091); return true; } } catch { return false; }
@@ -211,7 +218,7 @@ class SetupForm : Form
         var head = new Label { Text = "Replica Lab " + version, Font = new Font("Segoe UI Semibold", 15f), AutoSize = true, Location = new Point(24, 20) };
         var sub = new Label
         {
-            Text = "รัน image ในเครื่องเป็นหลาย replica บน Docker Swarm\nต้องมี Docker Desktop และ Node.js (โปรแกรมจะพาไปหน้าดาวน์โหลดถ้ายังไม่มี)",
+            Text = "รัน image ในเครื่องเป็นหลาย replica บน Docker Swarm\nต้องมี Docker Desktop" + (Setup.HasNode(zip) ? "" : " และ Node.js") + " (โปรแกรมจะพาไปหน้าดาวน์โหลดถ้ายังไม่มี)",
             ForeColor = Color.FromArgb(90, 90, 100), AutoSize = true, Location = new Point(26, 58)
         };
         var dirLabel = new Label { Text = "ติดตั้งที่", AutoSize = true, Location = new Point(26, 112) };

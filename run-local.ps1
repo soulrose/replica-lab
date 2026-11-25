@@ -17,13 +17,26 @@ param(
 $ErrorActionPreference = "Continue"
 Set-Location $PSScriptRoot
 . (Join-Path $PSScriptRoot "state.ps1")
+. (Join-Path $PSScriptRoot "site.ps1")
 function Step($m) { Write-Host "== $m" -ForegroundColor Cyan }
+
+# The Replica Lab page image. A unique tag per build, so 'stack deploy' restarts the page when its code changed.
+function Build-Page {
+    docker build -q --build-arg "BASE=$($site.nodeImage)" -t replica-lab-scaler:local .\scaler | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "docker build failed (base image $($site.nodeImage): is this PC online?)" }
+    $id = (docker image inspect replica-lab-scaler:local --format "{{.Id}}").Split(":")[1].Substring(0, 12)
+    docker tag replica-lab-scaler:local "replica-lab-scaler:$id"
+    return $id
+}
 
 # 1. Docker: installed? -> running? Not installed = open the download page; installed but stopped = start Docker Desktop and wait.
 Step "Docker"
 $dockerDownload = "https://www.docker.com/products/docker-desktop/"
 $desktopExe = @("$env:ProgramFiles\Docker\Docker\Docker Desktop.exe", "$env:LOCALAPPDATA\Programs\Docker\Docker\Docker Desktop.exe") |
     Where-Object { Test-Path $_ } | Select-Object -First 1
+# Docker installed after this window opened: its folder is not on our PATH yet
+$dockerBin = "$env:ProgramFiles\Docker\Docker\resources\bin"
+if (-not (Get-Command docker -ErrorAction SilentlyContinue) -and (Test-Path $dockerBin)) { $env:PATH = "$dockerBin;$env:PATH" }
 $hasCli = [bool](Get-Command docker -ErrorAction SilentlyContinue)
 if (-not $desktopExe -and -not $hasCli) {
     Write-Host "Docker Desktop is not installed on this PC. Opening the download page: $dockerDownload" -ForegroundColor Yellow
@@ -52,6 +65,11 @@ if ($swarm -ne "active") {
     docker swarm init | Out-Null
 }
 
+$site = Get-Site
+$env:PAGE_KEY = Get-PageKey
+$env:HARBOR_HOST = "$($site.harbor)"
+Step "site $($site.name)"
+
 # 2. Which app, and its profile
 $running = Get-RunningApp $Stack
 $currentFile = Join-Path $PSScriptRoot "config\current-app.txt"
@@ -70,10 +88,7 @@ if (-not $App) {
     Step "no app yet: Replica Lab page only"
     $ver = if (Test-Path (Join-Path $PSScriptRoot "VERSION")) { (Get-Content (Join-Path $PSScriptRoot "VERSION") -Raw).Trim() } else { "dev" }
     if ($running -and $running.name) { Save-RunningApp $Stack | Out-Null }
-    docker build -q -t replica-lab-scaler:local .\scaler | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "docker build failed" }
-    $scalerId = (docker image inspect replica-lab-scaler:local --format "{{.Id}}").Split(":")[1].Substring(0, 12)
-    docker tag replica-lab-scaler:local "replica-lab-scaler:$scalerId"
+    $scalerId = Build-Page
     $yml = @"
 # written by run-local.ps1: no app profile in apps\ yet, so only the Replica Lab page
 version: "3.8"
@@ -83,6 +98,8 @@ services:
     environment:
       TARGET_SERVICE: "${Stack}_app"
       APP_NONE: "true"
+      PAGE_KEY: "$env:PAGE_KEY"
+      HARBOR_HOST: "$env:HARBOR_HOST"
       RL_VERSION: "$ver"
       SCALER_MAX: "$Max"
     ports:
@@ -147,10 +164,7 @@ if ("$($p.attach)") {
         $names = @($link)
     }
     Step "Replica Lab page image"
-    docker build -q -t replica-lab-scaler:local .\scaler | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "docker build failed" }
-    $scalerId = (docker image inspect replica-lab-scaler:local --format "{{.Id}}").Split(":")[1].Substring(0, 12)
-    docker tag replica-lab-scaler:local "replica-lab-scaler:$scalerId"
+    $scalerId = Build-Page
     $health = "$($p.health)"; if (-not $health.StartsWith("/")) { $health = "/$health" }
     $maxR = [Math]::Max($Max, [int]$spec.Mode.Replicated.Replicas)
     $netRefs = ($names | ForEach-Object -Begin { $i = 0 } -Process { "n$i"; $i++ }) -join ", "
@@ -171,6 +185,8 @@ services:
       APP_BUILD_LOCAL: "false"
       APP_MEMORY: "0"
       APP_ATTACHED: "true"
+      PAGE_KEY: "$env:PAGE_KEY"
+      HARBOR_HOST: "$env:HARBOR_HOST"
       RL_VERSION: "$ver"
       SCALER_MAX: "$maxR"
     ports:
@@ -245,17 +261,14 @@ docker image inspect $Image *> $null
 if ($LASTEXITCODE -ne 0) { docker pull $Image; if ($LASTEXITCODE -ne 0) { throw "cannot pull $Image" } }
 
 Step "Replica Lab page image"
-docker build -q -t replica-lab-scaler:local .\scaler | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "docker build failed" }
-# unique tag per build, so 'stack deploy' restarts the page when its code changed
-$scalerId = (docker image inspect replica-lab-scaler:local --format "{{.Id}}").Split(":")[1].Substring(0, 12)
-docker tag replica-lab-scaler:local "replica-lab-scaler:$scalerId"
+$scalerId = Build-Page
 
 # 4. Deploy
 $health = "$($p.health)"
 if (-not $health.StartsWith("/")) { $health = "/$health" }
 $url = "http://localhost:$($p.port)$health"
-$healthCmd = "curl --noproxy localhost -fs -o /dev/null $url || wget --no-proxy -q -O /dev/null $url || exit 1"
+# curl, GNU wget, BusyBox wget (Alpine images without curl: no --no-proxy there)
+$healthCmd = "curl --noproxy localhost -fs -o /dev/null $url || wget --no-proxy -q -O /dev/null $url || wget -Y off -q -O /dev/null $url || exit 1"
 
 # RAM auto: before the replicas go up, run one trial container without a memory limit, wait until it is healthy,
 # watch its RAM for a while and set the limit to 1.5 x the peak (rounded up to 128 MB). The result is kept in the
@@ -263,8 +276,9 @@ $healthCmd = "curl --noproxy localhost -fs -o /dev/null $url || wget --no-proxy 
 if ($TuneRam -or [int]$p.memoryMb -le 0) {
     Step "RAM auto: measuring $App in a trial container"
     $trial = "replicalab-ramtune"
+    $dnsArgs = @($site.dns | Where-Object { $_ } | ForEach-Object { "--dns"; "$_" })
     docker rm -f $trial *> $null
-    docker run -d --name $trial --env-file $envRel --env-file $localRel --dns $(if ($env:RS_DNS1) { $env:RS_DNS1 } else { "10.6.22.16" }) --dns $(if ($env:RS_DNS2) { $env:RS_DNS2 } else { "10.6.22.15" }) $Image | Out-Null
+    docker run -d --name $trial --env-file $envRel --env-file $localRel @dnsArgs $Image | Out-Null
     $tuned = 0
     if ($LASTEXITCODE -eq 0) {
         $deadline = (Get-Date).AddSeconds([Math]::Max(60, [int]$p.startPeriod) + 60)
@@ -319,10 +333,17 @@ $env:APP_TEST = "$($p.test)"; $env:APP_BUILD_LOCAL = "$([bool]$p.buildLocal)".To
 $env:SCALER_PORT = "$ScalerPort"; $env:SCALER_MAX = "$Max"; $env:SCALER_IMAGE = "replica-lab-scaler:$scalerId"
 $env:RL_VERSION = if (Test-Path (Join-Path $PSScriptRoot "VERSION")) { (Get-Content (Join-Path $PSScriptRoot "VERSION") -Raw).Trim() } else { "dev" }
 Step "docker stack deploy $Stack ($App x $Replicas)"
+# DNS servers of this site (the hospital's: Docker Desktop cannot resolve internal hosts by itself) come as an overlay file
+$files = @("-c", "stack.yml")
+if (@($site.dns | Where-Object { $_ })) {
+    $dnsList = (@($site.dns) | ForEach-Object { '"' + $_ + '"' }) -join ", "
+    [IO.File]::WriteAllText((Join-Path $PSScriptRoot "config\stack-site.yml"), ('version: "3.8"', 'services:', '  app:', "    dns: [$dnsList]", '' -join "`n"))
+    $files += @("-c", "config/stack-site.yml")
+}
 # --resolve-image never: images are local on this single node. --prune removes services of an older layout.
 # Right after a stop (docker stack rm) the old network takes a few seconds to go away and the deploy fails, so retry.
 for ($try = 1; $try -le 10; $try++) {
-    docker stack deploy -c stack.yml --resolve-image never --prune $Stack
+    docker stack deploy @files --resolve-image never --prune $Stack
     if ($LASTEXITCODE -eq 0) { break }
     if ($try -eq 10) { throw "stack deploy failed" }
     Write-Host "   previous stack still shutting down, retry in 3 s ($try/10)"

@@ -7,11 +7,11 @@
 ## ติดตั้ง (ครั้งแรก)
 
 1. ติดตั้ง **Docker Desktop** ถ้ายังไม่มี โปรแกรมจะเปิดหน้าดาวน์โหลดให้เอง
-2. ติดตั้ง **Node.js รุ่น LTS** (https://nodejs.org/en/download) ถ้ายังไม่มี โปรแกรมจะเปิดหน้าดาวน์โหลดให้เอง
+2. ติดตั้ง **Node.js รุ่น LTS** (https://nodejs.org/en/download) ถ้ายังไม่มี โปรแกรมจะเปิดหน้าดาวน์โหลดให้เอง (**ชุดเต็ม `-full` ข้ามข้อนี้ได้** มี Node.js มาให้แล้ว)
 3. ลงโปรแกรมแบบใดแบบหนึ่ง
    - **ตัวติดตั้ง:** ดับเบิลคลิก `ReplicaLab-Setup-x.y.z.exe` กด ติดตั้ง (ค่าเริ่มต้น `%LOCALAPPDATA%\ReplicaLab` ห้ามมีช่องว่างใน path) ได้ไอคอนบน Desktop แล้วโปรแกรมเปิดเอง ถอนด้วย `ReplicaLab-Uninstall.exe`
    - **แบบ portable:** แตก zip ไว้ที่ path ที่ไม่มีช่องว่าง เช่น `C:\Tools\replica-lab` แล้วดับเบิลคลิก **`create-shortcut.cmd`** ในโฟลเดอร์ `replica-lab` (ย้ายโฟลเดอร์เมื่อไหร่ให้รันอีกครั้ง) เลิกใช้ = ลบโฟลเดอร์และไอคอนได้เลย
-4. **โปรแกรมเปล่า** (จาก GitHub, `replica-lab-x.y.z.zip`, `ReplicaLab-Setup-x.y.z.exe`) ยังไม่มีแอป เปิดครั้งแรกจะขึ้นหน้า **ยังไม่มีแอป** กด **เพิ่มแอปแรก** แล้วเลือก image ในเครื่อง, build จากโฟลเดอร์โปรเจกต์ หรือควบคุม service ใน swarm ค่าลับใส่เองใน `apps\<แอป>.local.env`
+4. **โปรแกรมเปล่า** (จาก GitHub, `replica-lab-x.y.z.zip`, `ReplicaLab-Setup-x.y.z.exe`) ยังไม่มีแอป เปิดครั้งแรกจะขึ้นหน้า **ยังไม่มีแอป** กด **ลองแอปตัวอย่าง** หรือ **เพิ่มแอปแรก** แล้วเลือก image ในเครื่อง, build จากโฟลเดอร์โปรเจกต์ หรือควบคุม service ใน swarm ค่าลับใส่เองใน `apps\<แอป>.local.env`
    - **ชุดของทีม** (`replica-lab-team.zip`, `ReplicaLab-Setup-x.y.z-team.exe`) มีแอปของทีมและ token มาให้แล้ว ส่งกันภายในทีมเท่านั้น
 
 ### เคยติดตั้งด้วย ReplicaLab-Setup (ตัวติดตั้งเดิม)
@@ -86,6 +86,7 @@ LABEL rama.lab.kind="tomcat" rama.lab.port="8080" rama.lab.health="/PatientProfi
 **ทำไฟล์ส่งต่อ:** `make-package.ps1` ทำไฟล์ไว้ที่โฟลเดอร์แม่ (`..\`)
 - ชุดของทีม (มีโปรไฟล์แอปและความลับของเครื่องนี้ ห้ามขึ้น GitHub): `replica-lab-team.zip`, `ReplicaLab-Setup-x.y.z-team.exe` เลือกเฉพาะบางแอปด้วย `-ExcludeApps a,b` เช่น `make-package.ps1 -ExcludeApps his-legacy-support,icheckup` ได้ชุดที่มีแค่ ramaservice
 - ชุดเปล่า (ไม่มีแอป ไม่มี token ขึ้น GitHub ได้): `replica-lab-x.y.z.zip`, `ReplicaLab-Setup-x.y.z.exe` สคริปต์ตรวจซ้ำว่าไม่มีไฟล์ใน `apps\` และ `config\` ก่อนปล่อย
+- ชุดเต็ม สำหรับคนนอกทีม (เหมือนชุดเปล่า แต่มี Node.js ของเครื่องที่แพค): `replica-lab-x.y.z-full.zip`, `ReplicaLab-Setup-x.y.z-full.exe` ปลายทางลงแค่ Docker Desktop
 - `ReplicaLab-Uninstall.exe` ถอนตัวที่ลงด้วย Setup
 
 **ความลับและโปรไฟล์แอป:** repo เป็นสาธารณะ ทั้งโฟลเดอร์ `apps\` (โปรไฟล์, env, token, ชุดทดสอบ) และ `config\` ไม่ขึ้น git อัปเดตก็ไม่แตะ ถ้าได้โปรแกรมเปล่า ให้ขอค่าจากทีมแล้วเพิ่มแอปเอง
@@ -98,7 +99,9 @@ LABEL rama.lab.kind="tomcat" rama.lab.port="8080" rama.lab.health="/PatientProfi
 | `apps/<แอป>.env` | environment ที่ส่งเข้า container (แก้ได้ในหน้าเพิ่ม/แก้แอป) |
 | `apps/<แอป>.local.env` | ความลับของเครื่องนี้ เช่น token (แก้ด้วย Notepad) |
 | `apps/<แอป>.tests.json` | ชุดทดสอบที่บันทึกไว้ของแอปนั้น |
-| `config/` | ค่าเฉพาะเครื่อง: แอปล่าสุด, image/replica/port ที่ใช้ล่าสุดของแต่ละแอป (ไม่ต้องส่งต่อ) |
+| `sites/<ชื่อ>.json` | เครือข่ายที่เครื่องอยู่: DNS, registry, image ฐานของหน้า (`config\site.txt` จำว่าเครื่องนี้ใช้ site ไหน) |
+| `samples/hello` | แอปตัวอย่าง |
+| `config/` | ค่าเฉพาะเครื่อง: รหัสของหน้า (`page-key.txt`), แอปล่าสุด, image/replica/port ที่ใช้ล่าสุดของแต่ละแอป (ไม่ต้องส่งต่อ) |
 | `builder/helper.log` | log ของตัวช่วยบนเครื่อง (เปิดแอป, สลับแอป, หยุดเพราะปิดหน้าต่าง, build) |
 | `create-shortcut.cmd` | สร้างไอคอนบน Desktop (ลบไอคอนเก่าในเมนู Start ถ้ามี) |
 | `start.cmd` / `stop.cmd` | เปิด / หยุด (ไอคอนเรียก start.cmd) |
@@ -118,5 +121,6 @@ LABEL rama.lab.kind="tomcat" rama.lab.port="8080" rama.lab.health="/PatientProfi
 ## ข้อควรระวัง
 - ทดสอบส่งซ้ำเขียนข้อมูลลง **DB จริงที่แอปต่ออยู่** (ramaservice คือ DB ของ dev) แอป WAR เก่ามักฝัง config DB ไว้ใน WAR ตรวจให้แน่ก่อนยิง
 - ใช้ได้บนเครื่องเดียว (single-node swarm) image ที่ build ในเครื่องใช้ได้ทันทีโดยไม่ต้อง push
-- container ใช้ DNS ของโรงพยาบาล (10.6.22.16, 10.6.22.15) เพื่อหาชื่อเครื่องภายในได้
+- site `rama` ให้ container ใช้ DNS ของโรงพยาบาล (10.6.22.16, 10.6.22.15) เพื่อหาชื่อเครื่องภายในได้ เลือกให้เองเมื่อเครื่องใช้ DNS นี้หรือเคยรันมาก่อน 1.5 เปลี่ยนเองได้ที่ `config\site.txt` (`rama` หรือ `default`)
+- หน้า Replica Lab สั่ง Docker ของเครื่องได้ทั้งหมด จึงใช้ได้จากเครื่องที่รันเท่านั้น port ของแอปยังเรียกจากเครื่องอื่นได้ตามเดิม
 - แอปเก่าที่เก็บ session ในหน่วยความจำ ถ้า request ไปตก replica อื่น login จะหลุด เพราะ Swarm กระจายตาม connection ไม่ติดตาม cookie

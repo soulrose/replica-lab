@@ -3,7 +3,7 @@ rem Replica Lab as its own window (like Hyperion API): start the helper, open th
 rem The launch page checks Docker, deploys the current app and moves on to the Replica Lab page.
 rem Closing the window stops everything (image / replicas / port of the app are remembered).
 cd /d "%~dp0"
-where node >nul 2>nul || goto nonode
+if not exist "%~dp0node\node.exe" where node >nul 2>nul || goto nonode
 call "%~dp0helper.cmd"
 rem wait until the helper listens (up to ~10 s)
 powershell -NoProfile -Command "for($i=0;$i -lt 40;$i++){try{(New-Object Net.Sockets.TcpClient).Connect('127.0.0.1',18091);break}catch{Start-Sleep -Milliseconds 250}}"

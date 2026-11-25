@@ -47,6 +47,7 @@
   <div class="track"><i></i></div>
   <pre id="lines" hidden></pre>
   <p class="hint" id="hint">ปิดหน้าต่างนี้เมื่อไหร่ ระบบจะหยุด replica ทั้งหมดให้เอง และจำ image กับจำนวน replica ไว้ใช้ครั้งหน้า</p>
+  <button id="dockerInstall" hidden>ติดตั้ง Docker Desktop ให้</button>
   <button id="retry" hidden>ลองใหม่</button>
 </main>
 <script>
@@ -86,8 +87,9 @@ async function poll() {
       $("card").className = "card err";
       $("step").textContent = /not installed/i.test(lines.join("\n")) ? "ยังไม่ได้ติดตั้ง Docker Desktop" : "เปิดไม่สำเร็จ";
       $("hint").textContent = /not installed/i.test(lines.join("\n"))
-        ? "เปิดหน้าดาวน์โหลด Docker Desktop ให้แล้ว ติดตั้งและเปิด Docker ครั้งแรกก่อน แล้วกดลองใหม่"
+        ? "เปิดหน้าดาวน์โหลด Docker Desktop ให้แล้ว หรือกดปุ่มด้านล่างให้ติดตั้งผ่าน winget ติดตั้งและเปิด Docker ครั้งแรกก่อน แล้วกดลองใหม่"
         : "ดูข้อความด้านบน แก้แล้วกดลองใหม่";
+      $("dockerInstall").hidden = !/not installed/i.test(lines.join("\n"));
       $("retry").hidden = false;
       clearInterval(timer);
       return;
@@ -97,10 +99,19 @@ async function poll() {
   } catch { $("step").textContent = "รอตัวช่วยบนเครื่อง…"; }
 }
 async function start() {
-  $("card").className = "card"; $("retry").hidden = true; $("step").textContent = "กำลังเตรียมฐาน…";
+  $("card").className = "card"; $("retry").hidden = true; $("dockerInstall").hidden = true; $("step").textContent = "กำลังเตรียมฐาน…";
   try { await fetch("/launch/start", { method: "POST", headers: H }); } catch { /* poll shows it */ }
   clearInterval(timer); timer = setInterval(poll, 1000); poll();
 }
+$("dockerInstall").onclick = async () => {
+  $("dockerInstall").disabled = true;
+  try {
+    const r = await (await fetch("/docker/install", { method: "POST", headers: H })).json();
+    $("hint").textContent = r.started ? "เปิดหน้าต่างติดตั้งแล้ว อ่านและยอมรับเงื่อนไขในหน้าต่างนั้น เสร็จแล้วเปิด Docker Desktop ครั้งแรก (เครื่องอาจต้องรีสตาร์ท) แล้วกดลองใหม่"
+                                      : "เครื่องนี้ไม่มี winget ใช้หน้าดาวน์โหลดที่เปิดให้แทน";
+  } catch { $("hint").textContent = "สั่งติดตั้งไม่ได้ ใช้หน้าดาวน์โหลดที่เปิดให้แทน"; }
+  $("dockerInstall").disabled = false;
+};
 $("retry").onclick = start;
 start();
 </script>
